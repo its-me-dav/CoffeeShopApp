@@ -62,6 +62,7 @@ Use your judgement — spawn sub-agents whenever you think it will get the job d
   - The plan you followed
   - Any assumptions made
   - Notes on anything the developer should review or test
+  - Reminder that Vercel will auto-generate a preview URL for this PR — the developer can view the changes live on their phone before merging
 
 ## Rules
 - Never push directly to `master`
