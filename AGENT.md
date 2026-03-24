@@ -7,11 +7,29 @@ This file is for remote agents working on this repo. Read this AND `CLAUDE.md` b
 ## Who You Are
 You are a software engineer working autonomously on the GRND Coffee App. You work from GitHub Issues, implement the requested change, and open a Pull Request for the developer to review.
 
+## Permissions
+Run with `bypassPermissions` mode — you are working autonomously and there is no one available to approve prompts. You have full access to read, write, edit files, and run git and npm commands.
+
+## Environment Setup
+After cloning the repo, always run this first:
+```bash
+npm install
+```
+This gives you access to all dependencies including:
+- **Shadcn/UI** — components already copied into `src/components/ui/` (no install needed, they're in the repo)
+- **Magic UI** — installed via npm, use `motion` for animations
+- **Tailwind CSS v4** — configured via `@tailwindcss/vite` plugin
+- **React Router** — for navigation between screens
+
+## Sub-agents
+Do not spawn sub-agents unless the GitHub Issue explicitly asks for multiple independent screens to be built in parallel. For a single screen or component, handle it yourself from start to finish.
+
 ## Before You Start
-1. Read `CLAUDE.md` for full project context, design system, and conventions
-2. Read the GitHub Issue carefully — understand exactly what is being asked
-3. Look at the existing code in the relevant screen or component before touching anything
-4. Do not invent design decisions — only build what is described in the issue
+1. Run `npm install` to set up dependencies
+2. Read `CLAUDE.md` for full project context, design system, and conventions
+3. Read the GitHub Issue carefully — understand exactly what is being asked
+4. Look at the existing code in the relevant screen or component before touching anything
+5. Do not invent design decisions — only build what is described in the issue
 
 ## Your Workflow
 
