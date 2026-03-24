@@ -78,5 +78,26 @@ A branded loyalty app for GRND Coffee Shop. Three core screens plus a leaderboar
 - Path alias: `@/` maps to `src/`
 - Components go in `src/components/`
 - UI primitives (Shadcn) in `src/components/ui/`
-- Screens/pages in `src/pages/` or `src/screens/`
-- Design in Pencil — share screenshots when building a specific screen
+- Shared layout components (BottomNav etc.) in `src/components/layout/`
+- Screens in `src/screens/`
+- Custom hooks in `src/hooks/`
+- Images/illustrations in `src/assets/images/`, icons in `src/assets/icons/`
+- No backend yet — all screens use hardcoded dummy data
+- Use Shadcn components for structure, Magic UI + Motion for animations
+- Mobile-first, max-width 430px, everything centered in `#root`
+- Font: Geist Variable (already imported via Shadcn setup)
+
+## Current Build Status
+- [ ] App shell + routing — done (React Router, 4 screens wired up)
+- [ ] Bottom navigation — placeholder only
+- [ ] Home screen — placeholder only
+- [ ] Card screen — placeholder only
+- [ ] Game screen — placeholder only
+- [ ] Leaderboard screen — placeholder only
+- [ ] Onboarding / auth screens — not started
+- [ ] Daily spin the wheel — not started
+
+## UI Design
+- Designs are created in Pencil by the developer
+- Screenshots shared per session before building each screen
+- Do not invent UI — wait for design input before building a screen
