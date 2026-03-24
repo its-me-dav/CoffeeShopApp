@@ -1,3 +1,5 @@
+@.claude/primer.md
+
 # GRND Coffee App
 
 A branded loyalty app for GRND Coffee Shop. Three core screens plus a leaderboard. The goal is to reward repeat customers and give them a reason to open the app daily.
@@ -96,6 +98,13 @@ A branded loyalty app for GRND Coffee Shop. Three core screens plus a leaderboar
 - [ ] Leaderboard screen — placeholder only
 - [ ] Onboarding / auth screens — not started
 - [ ] Daily spin the wheel — not started
+
+## Preferences
+- One clear next action per response, not a list
+- Confirm which screen we're working on before starting
+- Flag anything uncertain with [UNCLEAR]
+- Remind to commit and push at the end of each session
+- At the end of every session, rewrite `.claude/primer.md` with: what was completed, exact next step, open blockers. Keep it under 100 lines.
 
 ## UI Design
 - Designs are created in Pencil by the developer
