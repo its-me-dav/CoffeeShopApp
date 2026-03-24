@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//wsl$*untu/home/david/**)",
+      "Read(//c/Users/dodic/**)",
+      "Bash(find . -not -path */node_modules/* -not -path */.git/* -not -path */dist/* -type f -o -type d)"
+    ]
+  }
+}

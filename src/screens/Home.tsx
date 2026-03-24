@@ -1,3 +1,96 @@
+import { Coffee } from 'lucide-react'
+
+const user = {
+  name: 'Alex',
+  points: 2450,
+  nextReward: 3000,
+  streak: 7,
+  maxStreak: 10,
+}
+
 export default function Home() {
-  return <div>Home</div>
+  const pointsToGo = user.nextReward - user.points
+  const progress = (user.points / user.nextReward) * 100
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F5F4EF] pb-24">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 pt-14 pb-6">
+        <div className="flex items-center gap-2">
+          <Coffee size={20} strokeWidth={2.5} className="text-[#1A1A1A]" />
+          <span className="text-[15px] font-bold tracking-widest uppercase text-[#1A1A1A]">
+            GRND
+          </span>
+        </div>
+        <div className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center">
+          <span className="text-white text-[13px] font-semibold">
+            {user.name[0]}
+          </span>
+        </div>
+      </div>
+
+      <div className="px-6 space-y-6">
+        {/* Greeting */}
+        <div>
+          <p className="text-[#8A8A8E] text-[14px]">Welcome back</p>
+          <h1 className="text-[28px] font-semibold text-[#1A1A1A] leading-tight">
+            {getGreeting()}, {user.name}
+          </h1>
+        </div>
+
+        {/* Points Card */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm">
+          <p className="text-[#8A8A8E] text-[12px] uppercase tracking-widest font-medium mb-1">
+            Points Balance
+          </p>
+          <p className="text-[56px] font-bold text-[#1A1A1A] leading-none">
+            {user.points.toLocaleString()}
+          </p>
+          <p className="text-[#8A8A8E] text-[13px] mt-2">
+            {pointsToGo.toLocaleString()} points until your next reward
+          </p>
+
+          {/* Progress bar */}
+          <div className="mt-4 h-1.5 bg-[#F0EFEA] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#1A1A1A] rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Streak */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[14px] font-semibold text-[#1A1A1A]">
+              10-Day Streak
+            </p>
+            <p className="text-[13px] text-[#8A8A8E]">
+              {user.streak}/{user.maxStreak}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {Array.from({ length: user.maxStreak }).map((_, i) => (
+              <div
+                key={i}
+                className={`flex-1 h-2 rounded-full transition-colors ${
+                  i < user.streak ? 'bg-[#1A1A1A]' : 'bg-[#E5E5EA]'
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-[#8A8A8E] text-[12px] mt-3">
+            {user.maxStreak - user.streak} more visits to earn a free coffee
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
