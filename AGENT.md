@@ -48,7 +48,9 @@ Use your judgement — spawn sub-agents whenever you think it will get the job d
 - After each task, verify it works before moving to the next
 - Follow all conventions in `CLAUDE.md` exactly
 
-### Step 4 — Review your own work
+### Step 4 — Verify before shipping
+- Run `npm run build` — if it fails, fix all errors before continuing. Do not open a PR with a broken build.
+- Run `npx tsc --noEmit` to catch any TypeScript errors missed by the build
 - Re-read the original issue — did you actually solve it?
 - Check that nothing else broke
 - Make sure the code is clean and consistent with the rest of the project
