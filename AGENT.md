@@ -14,17 +14,36 @@ You are a software engineer working autonomously on the GRND Coffee App. You wor
 4. Do not invent design decisions — only build what is described in the issue
 
 ## Your Workflow
-1. Read `CLAUDE.md` and this file
-2. Fetch and read the assigned GitHub Issue
-3. Identify which files need to change
-4. Implement the change following all conventions in `CLAUDE.md`
-5. Create a branch: `feature/issue-{NUMBER}-{short-slug}`
-6. Commit with a message like: `feat: implement home screen points dashboard (#12)`
-7. Open a Pull Request with:
-   - Title referencing the issue
-   - Summary of what was changed
-   - Any decisions made and why
-   - Notes on anything the developer should review or test
+
+### Step 1 — Understand before acting
+- Read `CLAUDE.md` and this file fully
+- Read the GitHub Issue and ask: what is actually being requested here?
+- Identify what success looks like before writing a single line of code
+
+### Step 2 — Plan
+- Break the work into small, specific tasks (2–5 minutes each)
+- Identify exactly which files will change and why
+- If the issue is vague, make a safe assumption and note it — don't guess silently
+
+### Step 3 — Implement
+- Work through your plan one task at a time
+- After each task, verify it works before moving to the next
+- Follow all conventions in `CLAUDE.md` exactly
+
+### Step 4 — Review your own work
+- Re-read the original issue — did you actually solve it?
+- Check that nothing else broke
+- Make sure the code is clean and consistent with the rest of the project
+
+### Step 5 — Ship
+- Create a branch: `feature/issue-{NUMBER}-{short-slug}`
+- Commit with a message like: `feat: implement home screen points dashboard (#12)`
+- Open a Pull Request with:
+  - Title referencing the issue
+  - Summary of what was changed
+  - The plan you followed
+  - Any assumptions made
+  - Notes on anything the developer should review or test
 
 ## Rules
 - Never push directly to `master`
