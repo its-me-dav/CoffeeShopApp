@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 // Replace shop.svg with your own image (photo or illustration) at any time
-import shopImg from '@/assets/images/shop.svg'
+import shopImg from '@/assets/images/GRNDshop.png'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,10 @@ interface Player {
 
 interface Platform {
   id: number; x: number; y: number; width: number
+  type: 'normal' | 'crumble'
+  jumps: number
+  crumbling: boolean
+  crumbleTimer: number  // counts down from 45 when crumbling
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -28,8 +32,9 @@ const PLH         = 13
 const MAX_VX      = 7
 const TILT_MULT   = 0.18    // was 0.45 — much less sensitive
 const TILT_DEAD   = 4       // degrees dead zone before tilt kicks in, was 1.5
-const PB_KEY      = 'grnd_jump_pb'
-const WEEKLY_HIGH = 3_280
+const PB_KEY        = 'grnd_jump_pb'
+const WEEKLY_HIGH   = 3_280
+const SHOP_H_RATIO  = 0.30   // shop occupies bottom 30% of screen height
 
 // ─── Drawing helpers ──────────────────────────────────────────────────────────
 
@@ -122,15 +127,61 @@ function drawBean(
   ctx.restore()
 }
 
-function drawPlatform(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number,
-) {
+function drawPlatform(ctx: CanvasRenderingContext2D, pl: Platform) {
+  const { x, y, width: w, type, jumps, crumbling, crumbleTimer } = pl
+
   ctx.save()
-  ctx.beginPath()
-  rr(ctx, x, y, w, PLH, 7)
-  ctx.fillStyle = '#1A1A1A'
-  ctx.fill()
+
+  if (type === 'normal') {
+    // Outlined pill — white fill, dark border
+    ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+    ctx.strokeStyle = '#1A1A1A'
+    ctx.lineWidth = 2.5
+    ctx.stroke()
+
+  } else {
+    // Crumble platform
+    if (crumbling) {
+      // Three chunks fall and rotate separately
+      const progress = 1 - crumbleTimer / 45
+      const chunkW   = w / 3
+      ctx.globalAlpha = crumbleTimer / 45
+      for (let i = 0; i < 3; i++) {
+        const fallY  = progress * 80 * (1 + i * 0.25)
+        const rotate = progress * (i - 1) * 0.55
+        ctx.save()
+        ctx.translate(x + chunkW * i + chunkW / 2, y + PLH / 2 + fallY)
+        ctx.rotate(rotate)
+        ctx.beginPath(); rr(ctx, -chunkW / 2 + 1, -PLH / 2, chunkW - 2, PLH, PLH / 2)
+        ctx.fillStyle = '#F4A261'; ctx.fill()
+        ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2.5; ctx.stroke()
+        ctx.restore()
+      }
+      ctx.globalAlpha = 1
+    } else {
+      // Shake when 1st jump done (warn player)
+      const shakeX = jumps >= 1 ? (Math.random() - 0.5) * 3 : 0
+      ctx.translate(shakeX, 0)
+
+      // Outlined pill — orange fill, dark border
+      ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
+      ctx.fillStyle = '#F4A261'; ctx.fill()
+      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2.5; ctx.stroke()
+
+      // Cracks after first jump
+      if (jumps >= 1) {
+        ctx.strokeStyle = 'rgba(100,40,10,0.7)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'
+        ctx.beginPath(); ctx.moveTo(x + w * 0.32, y + 3); ctx.lineTo(x + w * 0.29, y + PLH - 3); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(x + w * 0.62, y + 3); ctx.lineTo(x + w * 0.66, y + PLH - 3); ctx.stroke()
+        ctx.lineWidth = 1; ctx.globalAlpha = 0.4
+        ctx.beginPath(); ctx.moveTo(x + w * 0.29, y + PLH * 0.5); ctx.lineTo(x + w * 0.62, y + PLH * 0.55); ctx.stroke()
+        ctx.globalAlpha = 1
+      }
+    }
+  }
+
   ctx.restore()
 }
 
@@ -202,15 +253,22 @@ function drawShop(
 
 // ─── Platform factory ─────────────────────────────────────────────────────────
 
+function makePlat(id: number, x: number, y: number, width: number, type: Platform['type']): Platform {
+  return { id, x, y, width, type, jumps: 0, crumbling: false, crumbleTimer: 0 }
+}
+
 function makePlatforms(W: number, H: number, idRef: { current: number }): Platform[] {
   const plats: Platform[] = []
-  plats.push({ id: idRef.current++, x: W / 2 - 55, y: H - 170, width: 110 })
-  let topY = H - 170
+  // First platform sits just above the shop (shop occupies bottom SHOP_H_RATIO of H)
+  const firstY = H * (1 - SHOP_H_RATIO) - 30
+  plats.push(makePlat(idRef.current++, W / 2 - 55, firstY, 110, 'normal'))
+  let topY = firstY
   for (let i = 0; i < 9; i++) {
-    const w = 70 + Math.random() * 45
-    const x = 10 + Math.random() * (W - w - 20)
-    topY -= 85 + Math.random() * 35
-    plats.push({ id: idRef.current++, x, y: topY, width: w })
+    const w    = 70 + Math.random() * 45
+    const x    = 10 + Math.random() * (W - w - 20)
+    topY      -= 85 + Math.random() * 35
+    const type = Math.random() < 0.3 ? 'crumble' : 'normal'
+    plats.push(makePlat(idRef.current++, x, topY, w, type))
   }
   return plats
 }
@@ -231,6 +289,13 @@ export default function Game() {
   const keysRef      = useRef({ left: false, right: false })
   const squishRef    = useRef(1)
   const platIdRef    = useRef(0)
+  const shopImgRef   = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    const img = new Image()
+    img.src = shopImg
+    img.onload = () => { shopImgRef.current = img }
+  }, [])
 
   const [phase, setPhase]               = useState<GamePhase>('idle')
   const [displayScore, setDisplayScore] = useState(0)
@@ -362,6 +427,7 @@ export default function Game() {
 
     if (p.vy > 0) {
       for (const pl of plats) {
+        if (pl.crumbling) continue  // can't land on already-crumbling platform
         const pb = p.y + p.h
         if (
           pb >= pl.y &&
@@ -369,9 +435,16 @@ export default function Game() {
           p.x + p.w > pl.x + 6 &&
           p.x       < pl.x + pl.width - 6
         ) {
-          p.y             = pl.y - p.h
-          p.vy            = JUMP_VY
+          p.y               = pl.y - p.h
+          p.vy              = JUMP_VY
           squishRef.current = 0.68
+          if (pl.type === 'crumble') {
+            pl.jumps++
+            if (pl.jumps >= 2) {
+              pl.crumbling    = true
+              pl.crumbleTimer = 45
+            }
+          }
           break
         }
       }
@@ -392,18 +465,20 @@ export default function Game() {
     }
 
     for (let i = plats.length - 1; i >= 0; i--) {
-      if (plats[i].y > H + 30) plats.splice(i, 1)
+      const pl = plats[i]
+      if (pl.crumbling) {
+        pl.crumbleTimer--
+        if (pl.crumbleTimer <= 0) { plats.splice(i, 1); continue }
+      }
+      if (pl.y > H + 30) plats.splice(i, 1)
     }
 
     const topY = plats.reduce((m, pl) => Math.min(m, pl.y), H)
     if (topY > 60) {
-      const w = 70 + Math.random() * 45
-      const x = 10 + Math.random() * (W - w - 20)
-      plats.push({
-        id: platIdRef.current++,
-        x, y: topY - (80 + Math.random() * 55),
-        width: w,
-      })
+      const w    = 70 + Math.random() * 45
+      const x    = 10 + Math.random() * (W - w - 20)
+      const type = Math.random() < 0.3 ? 'crumble' : 'normal'
+      plats.push(makePlat(platIdRef.current++, x, topY - (80 + Math.random() * 55), w, type))
     }
 
     if (p.y > H + 80) { endGame(); return }
@@ -413,13 +488,28 @@ export default function Game() {
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, W, H)
 
-    const shopH = H * 0.28, shopW = W * 0.72
+    // Platforms drawn first so the shop image paints over any that overlap it
+    plats.forEach(pl => drawPlatform(ctx, pl))
+
+    // Shop image — anchored to ground, scrolls with camera, no distortion
+    const shopH      = H * SHOP_H_RATIO
     const shopScreenY = H + cameraRef.current - shopH
     if (shopScreenY < H) {
-      drawShop(ctx, (W - shopW) / 2, shopScreenY, shopW, shopH)
+      const img = shopImgRef.current
+      if (img && img.naturalWidth > 0) {
+        // contain-fit: scale to fill full width, maintain aspect ratio
+        const aspect  = img.naturalWidth / img.naturalHeight
+        const drawW   = W
+        const drawH   = drawW / aspect
+        // if image is taller than shopH, scale down to shopH instead
+        const finalH  = Math.min(drawH, H)
+        const finalW  = finalH * aspect
+        ctx.drawImage(img, (W - finalW) / 2, H + cameraRef.current - finalH, finalW, finalH)
+      } else {
+        drawShop(ctx, (W - W * 0.72) / 2, shopScreenY, W * 0.72, shopH)
+      }
     }
 
-    plats.forEach(pl => drawPlatform(ctx, pl.x, pl.y, pl.width))
     drawBean(ctx, p.x, p.y, p.w, p.h, squishRef.current, p.vy)
 
     rafRef.current = requestAnimationFrame(tick)
@@ -528,11 +618,11 @@ export default function Game() {
           {/* Preview card */}
           <div className="mx-5 flex-1 min-h-0 bg-white rounded-3xl overflow-hidden relative shadow-sm">
 
-            {/* Static platform decorations */}
-            <div className="absolute top-[10%] left-[12%] w-[36%] h-[8px] bg-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[24%] right-[9%]  w-[40%] h-[8px] bg-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[40%] left-[16%] w-[32%] h-[8px] bg-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[54%] right-[12%] w-[38%] h-[8px] bg-[#1A1A1A] rounded-full" />
+            {/* Static platform decorations — outlined pill style matching gameplay */}
+            <div className="absolute top-[10%] left-[12%] w-[36%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[24%] right-[9%]  w-[40%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[40%] left-[16%] w-[32%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[54%] right-[12%] w-[38%] h-[13px] bg-[#F4A261] border-2 border-[#1A1A1A] rounded-full" />
 
             {/* Coffee shop image — bottom 40% of card */}
             {/* Swap shop.svg for your own image at src/assets/images/shop.svg */}
