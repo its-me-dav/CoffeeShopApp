@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
+// Replace shop.svg with your own image (photo or illustration) at any time
+import shopImg from '@/assets/images/shop.svg'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,11 +22,12 @@ interface Platform {
 
 const GRAVITY     = 0.38
 const JUMP_VY     = -13.5
-const PW          = 42       // player width
-const PH          = 50       // player height
-const PLH         = 13       // platform height
+const PW          = 42
+const PH          = 50
+const PLH         = 13
 const MAX_VX      = 7
-const TILT_MULT   = 0.45
+const TILT_MULT   = 0.18    // was 0.45 — much less sensitive
+const TILT_DEAD   = 4       // degrees dead zone before tilt kicks in, was 1.5
 const PB_KEY      = 'grnd_jump_pb'
 const WEEKLY_HIGH = 3_280
 
@@ -57,21 +60,18 @@ function drawBean(
 ) {
   ctx.save()
   ctx.translate(x + w / 2, y + h / 2)
-  ctx.scale(1 + (1 - squish) * 0.25, squish)   // squash-and-stretch
+  ctx.scale(1 + (1 - squish) * 0.25, squish)
 
-  // Body
   ctx.beginPath()
   ctx.ellipse(0, 2, w * 0.44, h * 0.4, 0, 0, Math.PI * 2)
   ctx.fillStyle = '#6B4423'
   ctx.fill()
 
-  // Shine
   ctx.beginPath()
   ctx.ellipse(-w * 0.12, -h * 0.1, w * 0.13, h * 0.09, -0.4, 0, Math.PI * 2)
   ctx.fillStyle = 'rgba(255,255,255,0.18)'
   ctx.fill()
 
-  // Crease
   ctx.beginPath()
   ctx.moveTo(0, -h * 0.34)
   ctx.bezierCurveTo(w * 0.19, -h * 0.08, w * 0.19, h * 0.08, 0, h * 0.34)
@@ -80,7 +80,6 @@ function drawBean(
   ctx.lineCap = 'round'
   ctx.stroke()
 
-  // Eyes
   ;([-1, 1] as const).forEach(side => {
     ctx.beginPath()
     ctx.ellipse(side * w * 0.14, -h * 0.05, 3.5, 4.5, 0, 0, Math.PI * 2)
@@ -92,14 +91,12 @@ function drawBean(
     ctx.fill()
   })
 
-  // Smile
   ctx.beginPath()
   ctx.arc(0, h * 0.1, w * 0.1, 0.3, Math.PI - 0.3)
   ctx.strokeStyle = '#3D2510'
   ctx.lineWidth = 2
   ctx.stroke()
 
-  // Arms — raised when going up fast, lowered when falling
   const armsUp = vy < -3
   ctx.strokeStyle = '#6B4423'
   ctx.lineWidth = 4.5
@@ -115,7 +112,6 @@ function drawBean(
     ctx.stroke()
   })
 
-  // Legs
   ;([-1, 1] as const).forEach(side => {
     ctx.beginPath()
     ctx.moveTo(side * w * 0.18, h * 0.36)
@@ -146,19 +142,16 @@ function drawShop(
   ctx.save()
   ctx.translate(x, y)
 
-  // Wall
   ctx.fillStyle = '#F5F4EF'
   ctx.fillRect(0, 0, w, h)
   ctx.strokeStyle = '#1A1A1A'
   ctx.lineWidth = 2
   ctx.strokeRect(1, 1, w - 2, h - 2)
 
-  // Awning base
   const aw = h * 0.27
   ctx.fillStyle = '#1A1A1A'
   ctx.fillRect(-2, 0, w + 4, aw)
 
-  // Stripe highlights
   ctx.fillStyle = 'white'
   const sc = 7
   const sw = w / sc
@@ -166,7 +159,6 @@ function drawShop(
     ctx.fillRect(i * sw, 0, sw * 0.55, aw - 2)
   }
 
-  // Scalloped bottom
   ctx.fillStyle = '#1A1A1A'
   ctx.beginPath()
   ctx.moveTo(-4, aw - 2)
@@ -179,7 +171,6 @@ function drawShop(
   ctx.closePath()
   ctx.fill()
 
-  // Sign
   ctx.textAlign = 'center'
   ctx.fillStyle = '#1A1A1A'
   ctx.font = `bold ${Math.max(h * 0.16, 12)}px Geist Variable, sans-serif`
@@ -188,7 +179,6 @@ function drawShop(
   ctx.font = `${Math.max(h * 0.09, 8)}px Geist Variable, sans-serif`
   ctx.fillText('COFFEE', w / 2, aw + h * 0.33)
 
-  // Door
   const dw = w * 0.26, dh = h * 0.36
   const dx = (w - dw) / 2, dy = h - dh
   ctx.fillStyle = '#1C1C1E'
@@ -196,7 +186,6 @@ function drawShop(
   rr(ctx, dx, dy, dw, dh, 4)
   ctx.fill()
 
-  // Windows
   const ww = w * 0.2, wh = h * 0.18, wy = aw + h * 0.36
   ctx.fillStyle = '#D4EAF0'
   ctx.strokeStyle = '#1A1A1A'
@@ -215,11 +204,7 @@ function drawShop(
 
 function makePlatforms(W: number, H: number, idRef: { current: number }): Platform[] {
   const plats: Platform[] = []
-
-  // Wide starting platform
   plats.push({ id: idRef.current++, x: W / 2 - 55, y: H - 170, width: 110 })
-
-  // Stack upward with consistent spacing
   let topY = H - 170
   for (let i = 0; i < 9; i++) {
     const w = 70 + Math.random() * 45
@@ -227,7 +212,6 @@ function makePlatforms(W: number, H: number, idRef: { current: number }): Platfo
     topY -= 85 + Math.random() * 35
     plats.push({ id: idRef.current++, x, y: topY, width: w })
   }
-
   return plats
 }
 
@@ -235,12 +219,8 @@ function makePlatforms(W: number, H: number, idRef: { current: number }): Platfo
 
 export default function Game() {
   const navigate = useNavigate()
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Canvas + container refs
-  const canvasRef    = useRef<HTMLCanvasElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Game state in refs (avoids stale closures inside RAF)
   const phaseRef     = useRef<GamePhase>('idle')
   const playerRef    = useRef<Player>({ x: 0, y: 0, vx: 0, vy: 0, w: PW, h: PH })
   const platformsRef = useRef<Platform[]>([])
@@ -252,7 +232,6 @@ export default function Game() {
   const squishRef    = useRef(1)
   const platIdRef    = useRef(0)
 
-  // React state for UI rendering
   const [phase, setPhase]               = useState<GamePhase>('idle')
   const [displayScore, setDisplayScore] = useState(0)
   const [finalScore, setFinalScore]     = useState(0)
@@ -260,74 +239,24 @@ export default function Game() {
     parseInt(localStorage.getItem(PB_KEY) || '0', 10)
   )
 
-  // ── Canvas sizing ──────────────────────────────────────────────────────────
+  // ── Canvas sizing — uses full viewport (canvas is fixed inset-0) ────────────
 
   const sizeCanvas = useCallback(() => {
-    const canvas    = canvasRef.current
-    const container = containerRef.current
-    if (!canvas || !container) return
-    const { width, height } = container.getBoundingClientRect()
-    const w = Math.round(width), h = Math.round(height)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const w = window.innerWidth
+    const h = window.innerHeight
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width  = w
       canvas.height = h
     }
   }, [])
 
-  // ── Idle preview draw ──────────────────────────────────────────────────────
-
-  const drawIdle = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const W = canvas.width, H = canvas.height
-
-    ctx.fillStyle = 'white'
-    ctx.fillRect(0, 0, W, H)
-
-    // Coffee shop at bottom
-    const shopW = W * 0.7, shopH = H * 0.3
-    drawShop(ctx, (W - shopW) / 2, H - shopH, shopW, shopH)
-
-    // Preview platforms
-    const prev = [
-      { x: W * 0.08, y: H * 0.66, w: W * 0.3 },
-      { x: W * 0.54, y: H * 0.52, w: W * 0.33 },
-      { x: W * 0.12, y: H * 0.39, w: W * 0.28 },
-      { x: W * 0.5,  y: H * 0.27, w: W * 0.34 },
-    ]
-    prev.forEach(p => drawPlatform(ctx, p.x, p.y, p.w))
-
-    // Bean sitting on second platform
-    const sp = prev[1]
-    drawBean(ctx, sp.x + sp.w / 2 - PW / 2, sp.y - PH - 2, PW, PH, 1, -1)
-
-    // Score pill
-    const label = 'SCORE: 0'
-    ctx.font     = 'bold 17px Geist Variable, sans-serif'
-    const pillW  = ctx.measureText(label).width + 36
-    ctx.fillStyle = '#1A1A1A'
-    ctx.beginPath()
-    rr(ctx, W / 2 - pillW / 2, 18, pillW, 40, 20)
-    ctx.fill()
-    ctx.fillStyle = 'white'
-    ctx.textAlign = 'center'
-    ctx.fillText(label, W / 2, 44)
-  }, [])
-
-  // ── Resize observer ────────────────────────────────────────────────────────
-
   useEffect(() => {
-    sizeCanvas()
-    drawIdle()
-    const obs = new ResizeObserver(() => {
-      sizeCanvas()
-      if (phaseRef.current === 'idle') drawIdle()
-    })
-    if (containerRef.current) obs.observe(containerRef.current)
-    return () => obs.disconnect()
-  }, [sizeCanvas, drawIdle])
+    if (phase !== 'playing') return
+    window.addEventListener('resize', sizeCanvas)
+    return () => window.removeEventListener('resize', sizeCanvas)
+  }, [phase, sizeCanvas])
 
   // ── Keyboard fallback ──────────────────────────────────────────────────────
 
@@ -376,7 +305,7 @@ export default function Game() {
 
   useEffect(() => {
     const handler = (e: DeviceOrientationEvent) => {
-      if (e.gamma != null) tiltRef.current = e.gamma   // −90 … +90 deg
+      if (e.gamma != null) tiltRef.current = e.gamma
     }
     window.addEventListener('deviceorientation', handler)
     return () => window.removeEventListener('deviceorientation', handler)
@@ -409,31 +338,28 @@ export default function Game() {
     const p     = playerRef.current
     const plats = platformsRef.current
 
-    // Horizontal — tilt wins over keys, keys are fallback
+    // Horizontal — tilt has a dead zone, then scales linearly
     let ax = 0
-    if      (keysRef.current.left)             ax = -TILT_MULT * 10
-    else if (keysRef.current.right)            ax =  TILT_MULT * 10
-    else if (Math.abs(tiltRef.current) > 1.5) ax =  tiltRef.current * TILT_MULT
+    if      (keysRef.current.left)                   ax = -TILT_MULT * 10
+    else if (keysRef.current.right)                  ax =  TILT_MULT * 10
+    else if (Math.abs(tiltRef.current) > TILT_DEAD)  ax =  tiltRef.current * TILT_MULT
 
     p.vx += ax
     p.vx  = Math.max(-MAX_VX, Math.min(MAX_VX, p.vx))
 
-    // Friction when no input
-    if (!keysRef.current.left && !keysRef.current.right && Math.abs(tiltRef.current) < 2) {
+    // Friction when no active input
+    if (!keysRef.current.left && !keysRef.current.right && Math.abs(tiltRef.current) < TILT_DEAD + 1) {
       p.vx *= 0.82
     }
 
     p.x += p.vx
 
-    // Horizontal wrap
     if (p.x + p.w < 0) p.x = W
     if (p.x > W)       p.x = -p.w
 
-    // Gravity
     p.vy += GRAVITY
     p.y  += p.vy
 
-    // Platform collision — only check when falling
     if (p.vy > 0) {
       for (const pl of plats) {
         const pb = p.y + p.h
@@ -451,12 +377,10 @@ export default function Game() {
       }
     }
 
-    // Recover squish
     if (squishRef.current < 1) {
       squishRef.current = Math.min(1, squishRef.current + 0.065)
     }
 
-    // Camera — keep player above 38% from top
     const threshold = H * 0.38
     if (p.y < threshold) {
       const delta = threshold - p.y
@@ -467,12 +391,10 @@ export default function Game() {
       setDisplayScore(scoreRef.current)
     }
 
-    // Remove platforms that fell off the bottom
     for (let i = plats.length - 1; i >= 0; i--) {
       if (plats[i].y > H + 30) plats.splice(i, 1)
     }
 
-    // Generate new platform at top as needed
     const topY = plats.reduce((m, pl) => Math.min(m, pl.y), H)
     if (topY > 60) {
       const w = 70 + Math.random() * 45
@@ -484,7 +406,6 @@ export default function Game() {
       })
     }
 
-    // Game over — fell below screen
     if (p.y > H + 80) { endGame(); return }
 
     // ── Draw ──────────────────────────────────────────────────────────────────
@@ -492,17 +413,13 @@ export default function Game() {
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, W, H)
 
-    // Coffee shop — anchored to world ground, scrolls off as camera rises
     const shopH = H * 0.28, shopW = W * 0.72
     const shopScreenY = H + cameraRef.current - shopH
     if (shopScreenY < H) {
       drawShop(ctx, (W - shopW) / 2, shopScreenY, shopW, shopH)
     }
 
-    // Platforms
     plats.forEach(pl => drawPlatform(ctx, pl.x, pl.y, pl.width))
-
-    // Player bean
     drawBean(ctx, p.x, p.y, p.w, p.h, squishRef.current, p.vy)
 
     rafRef.current = requestAnimationFrame(tick)
@@ -511,7 +428,6 @@ export default function Game() {
   // ── Start game ─────────────────────────────────────────────────────────────
 
   const startGame = useCallback(async () => {
-    // Request tilt permission on iOS 13+
     const DOE = DeviceOrientationEvent as unknown as {
       requestPermission?: () => Promise<string>
     }
@@ -519,11 +435,12 @@ export default function Game() {
       try { await DOE.requestPermission() } catch { /* ignore */ }
     }
 
+    // Size canvas to full viewport before reading W/H
+    sizeCanvas()
     const canvas = canvasRef.current
     if (!canvas) return
     const W = canvas.width, H = canvas.height
 
-    // Reset all game state
     cameraRef.current  = 0
     scoreRef.current   = 0
     squishRef.current  = 1
@@ -548,44 +465,47 @@ export default function Game() {
 
     cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(tick)
-  }, [tick])
+  }, [tick, sizeCanvas])
 
-  // ── Play again → reset to idle ─────────────────────────────────────────────
+  // ── Play again ─────────────────────────────────────────────────────────────
 
   const playAgain = useCallback(() => {
     phaseRef.current = 'idle'
     setPhase('idle')
-    // Let React render the idle overlay, then redraw the canvas
-    setTimeout(() => { sizeCanvas(); drawIdle() }, 0)
-  }, [sizeCanvas, drawIdle])
+  }, [])
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative w-full overflow-hidden bg-white" style={{ height: '100svh' }}>
+    <div className="relative w-full" style={{ height: '100svh' }}>
 
-      {/* Canvas — always mounted, stops above the bottom nav */}
-      <div ref={containerRef} className="absolute inset-0 bottom-16">
-        <canvas
-          ref={canvasRef}
-          style={{ display: 'block', width: '100%', height: '100%' }}
-        />
-      </div>
+      {/* Canvas — always mounted, fullscreen fixed overlay when playing */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 z-50"
+        style={{
+          display: phase === 'playing' ? 'block' : 'none',
+          width: '100%',
+          height: '100%',
+        }}
+      />
 
-      {/* ── IDLE overlay ────────────────────────────────────────────────── */}
+      {/* Score pill — sits above canvas during play */}
+      {phase === 'playing' && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[15px] font-bold px-5 py-2 rounded-full z-[60] pointer-events-none whitespace-nowrap">
+          SCORE: {displayScore.toLocaleString()}
+        </div>
+      )}
+
+      {/* ── IDLE screen ────────────────────────────────────────────────────── */}
       {phase === 'idle' && (
-        <div className="absolute inset-0 bottom-16 flex flex-col pointer-events-none">
+        <div className="flex flex-col bg-[#F5F4EF]" style={{ height: 'calc(100svh - 4rem)' }}>
 
           {/* Top bar */}
-          <div className="flex items-center justify-between px-6 pt-12 pointer-events-auto">
-            <div>
-              <p className="text-[#8A8A8E] text-[11px] uppercase tracking-widest">
-                This week
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Trophy size={13} className="text-[#F4A261]" />
-                <p className="text-[13px] font-semibold text-[#1A1A1A]">Free Coffee</p>
-              </div>
+          <div className="flex items-center justify-between px-5 pt-10 pb-1 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <Trophy size={14} className="text-[#F4A261]" />
+              <span className="text-[13px] font-semibold text-[#1A1A1A]">Free Coffee</span>
             </div>
             <button
               onClick={() => navigate('/leaderboard')}
@@ -596,20 +516,43 @@ export default function Game() {
           </div>
 
           {/* Title */}
-          <div className="text-center px-6 mt-2">
-            <h1 className="text-[38px] font-black uppercase tracking-tight text-[#1A1A1A]">
+          <div className="text-center px-5 pt-3 pb-2 shrink-0">
+            <h1 className="text-[42px] font-black uppercase tracking-tight leading-none text-[#1A1A1A]">
               GRND Jump
             </h1>
-            <p className="text-[#8A8A8E] text-[12px] mt-0.5">
-              Tilt to steer · land on platforms
+            <p className="text-[#8A8A8E] text-[12px] mt-1.5">
+              Tap to jump your way to the top
             </p>
           </div>
 
-          <div className="flex-1" />
+          {/* Preview card */}
+          <div className="mx-5 flex-1 min-h-0 bg-white rounded-3xl overflow-hidden relative shadow-sm">
 
-          {/* Start section */}
-          <div className="px-6 pb-4 space-y-2.5 pointer-events-auto">
-            <p className="text-[#8A8A8E] text-[13px] text-center">
+            {/* Static platform decorations */}
+            <div className="absolute top-[10%] left-[12%] w-[36%] h-[8px] bg-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[24%] right-[9%]  w-[40%] h-[8px] bg-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[40%] left-[16%] w-[32%] h-[8px] bg-[#1A1A1A] rounded-full" />
+            <div className="absolute top-[54%] right-[12%] w-[38%] h-[8px] bg-[#1A1A1A] rounded-full" />
+
+            {/* Coffee shop image — bottom 40% of card */}
+            {/* Swap shop.svg for your own image at src/assets/images/shop.svg */}
+            <div className="absolute bottom-0 left-0 right-0 h-[40%]">
+              <img
+                src={shopImg}
+                alt="GRND Coffee Shop"
+                className="w-full h-full object-contain object-bottom"
+              />
+            </div>
+
+            {/* Score pill preview */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[13px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
+              SCORE: 0
+            </div>
+          </div>
+
+          {/* Personal best + Start */}
+          <div className="px-5 pt-3 pb-4 space-y-2.5 shrink-0">
+            <p className="text-center text-[13px] text-[#8A8A8E]">
               Personal best:{' '}
               <span className="text-[#1A1A1A] font-bold">
                 {personalBest > 0 ? personalBest.toLocaleString() : '—'}
@@ -625,18 +568,10 @@ export default function Game() {
         </div>
       )}
 
-      {/* ── PLAYING — score pill (React element, always crisp) ───────────── */}
-      {phase === 'playing' && (
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[15px] font-bold px-5 py-2 rounded-full pointer-events-none z-10 whitespace-nowrap">
-          SCORE: {displayScore.toLocaleString()}
-        </div>
-      )}
-
-      {/* ── GAME OVER overlay ────────────────────────────────────────────── */}
+      {/* ── GAME OVER — fullscreen overlay ─────────────────────────────────── */}
       {phase === 'gameover' && (
-        <div className="absolute inset-0 bottom-16 bg-[#F5F4EF] flex flex-col items-center justify-center px-6 gap-5">
+        <div className="fixed inset-0 z-50 bg-[#F5F4EF] flex flex-col items-center justify-center px-6 gap-5">
 
-          {/* Score */}
           <div className="text-center">
             <p className="text-[#8A8A8E] text-[11px] uppercase tracking-widest mb-1">
               Game Over
@@ -647,7 +582,6 @@ export default function Game() {
             <p className="text-[#8A8A8E] text-[14px] mt-1">Final Score</p>
           </div>
 
-          {/* Stats card */}
           <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="flex justify-between items-center px-5 py-3.5 border-b border-[#E5E5EA]">
               <span className="text-[#8A8A8E] text-[13px]">Personal Best</span>
@@ -663,7 +597,6 @@ export default function Game() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="w-full space-y-2.5">
             <button className="w-full bg-[#F4A261] text-white rounded-2xl py-4 text-[15px] font-bold active:scale-95 transition-transform">
               Claim Weekly Prize
