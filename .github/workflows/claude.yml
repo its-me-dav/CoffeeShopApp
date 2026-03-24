@@ -1,17 +1,13 @@
 name: Claude Agent
 
 on:
-  issues:
-    types: [opened]
   issue_comment:
     types: [created]
 
 jobs:
   claude:
-    # Only run on new issues, or comments that contain @claude
-    if: |
-      github.event_name == 'issues' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    # Only run when a comment contains @claude
+    if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
     permissions:
       contents: write
