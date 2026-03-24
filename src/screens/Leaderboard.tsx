@@ -2,7 +2,6 @@ import { Trophy, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 
-const currentUser = 'Alex'
 
 const tabs = ['Global', 'Friends', 'Weekly']
 

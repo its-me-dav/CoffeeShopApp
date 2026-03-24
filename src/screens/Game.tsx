@@ -48,7 +48,7 @@ export default function Game() {
         <div className="w-full bg-white rounded-3xl overflow-hidden shadow-sm aspect-[3/4] flex flex-col justify-end relative">
           {/* Platforms placeholder */}
           <div className="absolute inset-0 flex flex-col justify-around items-center px-8">
-            {[0.2, 0.38, 0.55, 0.72].map((pos, i) => (
+            {[0.2, 0.38, 0.55, 0.72].map((_pos, i) => (
               <div
                 key={i}
                 className="w-20 h-2 bg-[#1A1A1A] rounded-full"
