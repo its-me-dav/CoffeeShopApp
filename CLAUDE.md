@@ -1,4 +1,5 @@
 @.claude/primer.md
+@AGENT.md
 
 # GRND Coffee App
 

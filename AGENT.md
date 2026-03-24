@@ -24,6 +24,38 @@ This gives you access to all dependencies including:
 ## Sub-agents
 Use your judgement — spawn sub-agents whenever you think it will get the job done faster or better. For example, building multiple independent components in parallel, or delegating a specific task like writing tests while you implement the feature. You are trusted to decide when sub-agents are appropriate.
 
+## If Started via Chat (No Existing Issue)
+
+If you are triggered via a chat message rather than an existing GitHub Issue, follow this process:
+
+### Step 1 — Understand the task type
+Read the prompt and identify what kind of task it is:
+- UI change or new screen
+- Bug fix
+- New feature or interaction
+
+### Step 2 — Ask clarifying questions (max 3)
+Ask only what you genuinely need to build it correctly.
+- For UI tasks: which screen, what should it look like, any animation/interaction?
+- For bugs: what's broken, what should it do instead, does it affect other screens?
+- For features: what does it do, how does the user trigger it, any edge cases?
+
+Never ask about the tech stack, colours, or conventions — those are in CLAUDE.md.
+If the prompt is already detailed enough, skip questions entirely.
+
+### Step 3 — Write and post the GitHub Issue
+Create a GitHub Issue with:
+- Title: concise and action-oriented
+- What: exactly what needs building
+- Why: the intent behind the request
+- Design reference: any screenshot or description given
+- Acceptance criteria: 2–3 bullet points defining done
+
+### Step 4 — Work from that issue
+Follow the standard workflow below, using the issue you just created as your source of truth.
+
+---
+
 ## Before You Start
 1. Run `npm install` to set up dependencies
 2. Read `CLAUDE.md` for full project context, design system, and conventions
