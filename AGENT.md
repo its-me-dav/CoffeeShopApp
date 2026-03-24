@@ -22,7 +22,7 @@ This gives you access to all dependencies including:
 - **React Router** — for navigation between screens
 
 ## Sub-agents
-Do not spawn sub-agents unless the GitHub Issue explicitly asks for multiple independent screens to be built in parallel. For a single screen or component, handle it yourself from start to finish.
+Use your judgement — spawn sub-agents whenever you think it will get the job done faster or better. For example, building multiple independent components in parallel, or delegating a specific task like writing tests while you implement the feature. You are trusted to decide when sub-agents are appropriate.
 
 ## Before You Start
 1. Run `npm install` to set up dependencies
