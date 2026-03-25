@@ -33,8 +33,8 @@ interface Platform {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GRAVITY     = 0.1143 // scaled with JUMP_VY to preserve 1.25s air time
-const JUMP_VY     = -8.55  // 10% lower than original, air time unchanged
+const GRAVITY     = 0.143  // tuned for ~1.0s air time
+const JUMP_VY     = -8.55
 const PW          = 86
 const PH          = 101
 const PLH         = 13
@@ -754,15 +754,6 @@ export default function Game() {
       const pb = parseInt(localStorage.getItem(PB_KEY) || '0', 10)
       if (!pbPassedRef.current && pb > 0 && scoreRef.current > pb) {
         pbPassedRef.current = true
-        showHud('🎉 NEW PERSONAL BEST!')
-      }
-      // Proximity to weekly record
-      const top = weeklyTopRef.current
-      if (top > 0 && !pbPassedRef.current) {
-        const gap = top - scoreRef.current
-        if (gap > 0 && gap <= 200 && Math.floor(scoreRef.current) % 50 === 0) {
-          showHud(`${gap} pts from weekly record!`)
-        }
       }
     }
 
@@ -851,6 +842,29 @@ export default function Game() {
     // Platforms drawn first so the shop image paints over any that overlap it
     plats.forEach(pl => drawPlatform(ctx, pl))
     sugarCubesRef.current.forEach(sc => drawSugarCube(ctx, sc.x, sc.y))
+
+    // ── PB dashed line — world-space height marker ─────────────────────────
+    const pbScore = parseInt(localStorage.getItem(PB_KEY) || '0', 10)
+    if (pbScore > 0) {
+      const pbScreenY = H * 0.38 + cameraRef.current - pbScore * 7
+      if (pbScreenY >= 0 && pbScreenY <= H) {
+        ctx.save()
+        ctx.setLineDash([10, 6])
+        ctx.strokeStyle = 'rgba(26, 26, 26, 0.22)'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(0, pbScreenY)
+        ctx.lineTo(W, pbScreenY)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.font = 'bold 10px sans-serif'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'bottom'
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.35)'
+        ctx.fillText(pbPassedRef.current ? 'NEW PERSONAL BEST' : 'BEAT THIS', W - 8, pbScreenY - 3)
+        ctx.restore()
+      }
+    }
 
     // Shop image — anchored to ground, scrolls with camera, no distortion
     const shopH      = H * SHOP_H_RATIO
@@ -984,31 +998,28 @@ export default function Game() {
         }}
       />
 
-      {/* Score pill — sits above canvas during play */}
+      {/* Score pill — centered; weekly pill floats to the right without shifting the score */}
+      {/* Score pill — dead center */}
       {phase === 'playing' && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[15px] font-bold px-5 py-2 rounded-full z-[60] pointer-events-none whitespace-nowrap">
-          SCORE: {displayScore.toLocaleString()}
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[60] pointer-events-none">
+          <div className="bg-[#1A1A1A] text-white text-[15px] font-bold px-6 py-2.5 rounded-full whitespace-nowrap">
+            SCORE: {displayScore.toLocaleString()}
+          </div>
         </div>
       )}
 
-      {/* PB / weekly record HUD flash */}
-      {phase === 'playing' && hudMsg && (
-        <div className="fixed top-[calc(3rem+3rem)] left-1/2 -translate-x-1/2 bg-[#1A1A1A]/80 backdrop-blur-sm text-white text-[13px] font-bold px-4 py-2 rounded-full whitespace-nowrap z-[60] pointer-events-none">
-          {hudMsg}
-        </div>
-      )}
-
-      {/* PB and weekly record indicators */}
-      {phase === 'playing' && (
-        <div className="fixed top-10 right-3 flex flex-col items-end gap-0.5 z-[60] pointer-events-none">
-          {personalBest > 0 && (
-            <div className="bg-white/70 backdrop-blur-sm rounded-full px-2 py-0.5">
-              <span className="text-[10px] font-semibold text-[#1A1A1A]">PB {personalBest.toLocaleString()}</span>
+      {/* Weekly record pill — right quarter, never overlaps score */}
+      {phase === 'playing' && weeklyTopRef.current > 0 && (
+        <div className="fixed top-[3.1rem] right-4 z-[60] pointer-events-none">
+          {displayScore >= weeklyTopRef.current ? (
+            <div className="bg-[#2ECC71] rounded-full px-2.5 py-1.5 whitespace-nowrap">
+              <span className="text-[10px] font-bold text-white">🏆 Record!</span>
             </div>
-          )}
-          {weeklyTopRef.current > 0 && (
-            <div className="bg-[#F4A261]/80 backdrop-blur-sm rounded-full px-2 py-0.5">
-              <span className="text-[10px] font-semibold text-white">🏆 {weeklyTopRef.current.toLocaleString()}</span>
+          ) : (
+            <div className="bg-[#F4A261]/90 rounded-full px-2.5 py-1.5 whitespace-nowrap">
+              <span className="text-[10px] font-bold text-white">
+                🏆 {(weeklyTopRef.current - displayScore).toLocaleString()} to beat
+              </span>
             </div>
           )}
         </div>
