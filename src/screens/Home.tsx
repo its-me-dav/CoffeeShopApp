@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Coffee } from 'lucide-react'
 import { NumberTicker } from '@/components/ui/number-ticker'
 import introSrc  from '@/assets/videos/mascot-intro.mp4'
@@ -58,7 +57,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F4EF] pb-56">
+    <div className="min-h-screen bg-[#F5F4EF] pb-24">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-14 pb-6">
         <div className="flex items-center gap-2">
@@ -118,28 +117,28 @@ export default function Home() {
           </p>
         </div>
 
-      </div>
+        {/* Mascot — sits below streak card in the page flow */}
+        <div className="flex justify-center pt-2 pb-4">
+          <div className="w-44 h-44 pointer-events-none">
+            <video
+              ref={introRef}
+              src={introSrc}
+              playsInline
+              muted
+              onEnded={handleIntroEnded}
+              className="w-full h-full object-contain"
+              style={{ display: showGif ? 'none' : 'block' }}
+            />
+            <img
+              src={mascotGif}
+              alt="GRND mascot"
+              className="w-full h-full object-contain"
+              style={{ display: showGif ? 'block' : 'none' }}
+            />
+          </div>
+        </div>
 
-      {createPortal(
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-40">
-          <video
-            ref={introRef}
-            src={introSrc}
-            playsInline
-            muted
-            onEnded={handleIntroEnded}
-            className="w-full h-full object-contain"
-            style={{ display: showGif ? 'none' : 'block' }}
-          />
-          <img
-            src={mascotGif}
-            alt="GRND mascot"
-            className="w-full h-full object-contain"
-            style={{ display: showGif ? 'block' : 'none' }}
-          />
-        </div>,
-        document.body
-      )}
+      </div>
     </div>
   )
 }
