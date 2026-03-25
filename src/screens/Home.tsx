@@ -118,8 +118,8 @@ export default function Home() {
         </div>
 
         {/* Mascot — sits below streak card in the page flow */}
-        <div className="flex justify-center pt-2 pb-4">
-          <div className="w-44 h-44 pointer-events-none">
+        <div className="flex justify-center pt-1 pb-2">
+          <div className="w-[352px] h-[352px] pointer-events-none">
             <video
               ref={introRef}
               src={introSrc}
