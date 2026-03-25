@@ -2,7 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 // Replace shop.svg with your own image (photo or illustration) at any time
-import shopImg from '@/assets/images/GRNDshop.png'
+import shopImg       from '@/assets/images/GRNDshop.png'
+import sprRightIdle  from '@/assets/images/bean-right-idle.png'
+import sprRightJump  from '@/assets/images/bean-right-jump.png'
+import sprLeftIdle   from '@/assets/images/bean-left-idle.png'
+import sprLeftJump   from '@/assets/images/bean-left-jump.png'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -13,6 +17,8 @@ interface Player {
   vx: number; vy: number
   w: number; h: number
 }
+
+interface SugarCube { id: number; x: number; y: number }
 
 interface Platform {
   id: number; x: number; y: number; width: number
@@ -26,15 +32,18 @@ interface Platform {
 
 const GRAVITY     = 0.38
 const JUMP_VY     = -13.5
-const PW          = 42
-const PH          = 50
+const PW          = 76
+const PH          = 90
 const PLH         = 13
 const MAX_VX      = 7
 const TILT_MULT   = 0.18    // was 0.45 — much less sensitive
 const TILT_DEAD   = 4       // degrees dead zone before tilt kicks in, was 1.5
-const PB_KEY        = 'grnd_jump_pb'
-const WEEKLY_HIGH   = 3_280
-const SHOP_H_RATIO  = 0.30   // shop occupies bottom 30% of screen height
+const PB_KEY             = 'grnd_jump_pb'
+const WEEKLY_HIGH        = 3_280
+const SHOP_H_RATIO       = 0.30   // shop occupies bottom 30% of screen height
+const SUGAR_RUSH_FRAMES  = 6 * 60        // 6 s at ~60 fps
+const SUGAR_LIFT_VY      = JUMP_VY * 4   // upward velocity applied every frame during rush
+const SC_SIZE            = 22            // sugar cube px
 
 // ─── Drawing helpers ──────────────────────────────────────────────────────────
 
@@ -65,63 +74,163 @@ function drawBean(
 ) {
   ctx.save()
   ctx.translate(x + w / 2, y + h / 2)
-  ctx.scale(1 + (1 - squish) * 0.25, squish)
-
-  ctx.beginPath()
-  ctx.ellipse(0, 2, w * 0.44, h * 0.4, 0, 0, Math.PI * 2)
-  ctx.fillStyle = '#6B4423'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.ellipse(-w * 0.12, -h * 0.1, w * 0.13, h * 0.09, -0.4, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,0.18)'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.moveTo(0, -h * 0.34)
-  ctx.bezierCurveTo(w * 0.19, -h * 0.08, w * 0.19, h * 0.08, 0, h * 0.34)
-  ctx.strokeStyle = '#3D2510'
-  ctx.lineWidth = 2.5
-  ctx.lineCap = 'round'
-  ctx.stroke()
-
-  ;([-1, 1] as const).forEach(side => {
-    ctx.beginPath()
-    ctx.ellipse(side * w * 0.14, -h * 0.05, 3.5, 4.5, 0, 0, Math.PI * 2)
-    ctx.fillStyle = 'white'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.ellipse(side * w * 0.14, -h * 0.03, 2, 3, 0, 0, Math.PI * 2)
-    ctx.fillStyle = '#1A1A1A'
-    ctx.fill()
-  })
-
-  ctx.beginPath()
-  ctx.arc(0, h * 0.1, w * 0.1, 0.3, Math.PI - 0.3)
-  ctx.strokeStyle = '#3D2510'
-  ctx.lineWidth = 2
-  ctx.stroke()
+  ctx.scale(1 + (1 - squish) * 0.3, squish)
 
   const armsUp = vy < -3
-  ctx.strokeStyle = '#6B4423'
-  ctx.lineWidth = 4.5
+
+  // ── Body with radial gradient ──────────────────────────────────────────────
+  const bodyGrad = ctx.createRadialGradient(-w * 0.1, -h * 0.14, 2, 0, 0, w * 0.52)
+  bodyGrad.addColorStop(0,   '#B5763A')   // warm highlight
+  bodyGrad.addColorStop(0.5, '#8B5228')   // mid coffee brown
+  bodyGrad.addColorStop(1,   '#4E2A0C')   // dark shadow edge
+
+  ctx.beginPath()
+  ctx.ellipse(0, 2, w * 0.46, h * 0.43, 0, 0, Math.PI * 2)
+  ctx.fillStyle = bodyGrad
+  ctx.fill()
+
+  // Drop shadow under body (gives lift)
+  ctx.beginPath()
+  ctx.ellipse(0, h * 0.44, w * 0.36, h * 0.07, 0, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'
+  ctx.fill()
+
+  // ── Bean crease ────────────────────────────────────────────────────────────
+  ctx.beginPath()
+  ctx.moveTo(0, -h * 0.38)
+  ctx.bezierCurveTo(w * 0.21, -h * 0.1, w * 0.21, h * 0.1, 0, h * 0.38)
+  ctx.strokeStyle = '#3A1E08'
+  ctx.lineWidth = 2.8
+  ctx.lineCap = 'round'
+  ctx.stroke()
+
+  // ── Rosy cheeks ────────────────────────────────────────────────────────────
+  ctx.save()
+  ctx.globalAlpha = 0.22
+  ;([-1, 1] as const).forEach(side => {
+    ctx.beginPath()
+    ctx.ellipse(side * w * 0.24, h * 0.07, w * 0.12, h * 0.075, 0, 0, Math.PI * 2)
+    ctx.fillStyle = '#FF6B6B'
+    ctx.fill()
+  })
+  ctx.restore()
+
+  // ── Eyes ───────────────────────────────────────────────────────────────────
+  ;([-1, 1] as const).forEach(side => {
+    const ex = side * w * 0.155
+    const ey = -h * 0.09
+
+    // White sclera
+    ctx.beginPath()
+    ctx.ellipse(ex, ey, 6, 7.5, 0, 0, Math.PI * 2)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+
+    // Coloured iris
+    ctx.beginPath()
+    ctx.ellipse(ex, ey + 1.5, 4, 5, 0, 0, Math.PI * 2)
+    ctx.fillStyle = '#3B1F0A'
+    ctx.fill()
+
+    // Pupil
+    ctx.beginPath()
+    ctx.ellipse(ex, ey + 1.5, 2.2, 3, 0, 0, Math.PI * 2)
+    ctx.fillStyle = '#0A0400'
+    ctx.fill()
+
+    // Sparkle highlight
+    ctx.beginPath()
+    ctx.ellipse(ex + 2, ey - 0.5, 1.8, 1.8, 0, 0, Math.PI * 2)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+
+    // Small secondary sparkle
+    ctx.beginPath()
+    ctx.ellipse(ex - 1.5, ey + 3, 0.9, 0.9, 0, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    ctx.fill()
+  })
+
+  // ── Eyebrows (friendly arch, slightly raised) ──────────────────────────────
+  ctx.strokeStyle = '#3A1E08'
+  ctx.lineWidth = 2.2
   ctx.lineCap = 'round'
   ;([-1, 1] as const).forEach(side => {
-    const angle = armsUp ? -0.75 : 0.35
     ctx.beginPath()
-    ctx.moveTo(side * w * 0.4, 0)
-    ctx.lineTo(
-      side * (w * 0.4 + Math.cos(angle) * 13),
-      -Math.sin(angle) * 13,
-    )
+    ctx.arc(side * w * 0.155, -h * 0.26, 7, Math.PI + 0.45, -0.45)
     ctx.stroke()
   })
 
-  ;([-1, 1] as const).forEach(side => {
+  // ── Mouth ──────────────────────────────────────────────────────────────────
+  if (armsUp) {
+    // Big open happy grin when jumping
     ctx.beginPath()
-    ctx.moveTo(side * w * 0.18, h * 0.36)
-    ctx.lineTo(side * w * 0.28, h * 0.52)
+    ctx.arc(0, h * 0.11, w * 0.155, 0.18, Math.PI - 0.18)
+    ctx.strokeStyle = '#3A1E08'
+    ctx.lineWidth = 2.5
     ctx.stroke()
+    // Tongue peeking
+    ctx.beginPath()
+    ctx.ellipse(0, h * 0.2, w * 0.07, h * 0.04, 0, 0, Math.PI)
+    ctx.fillStyle = '#E8706A'
+    ctx.fill()
+  } else {
+    // Friendly closed smile
+    ctx.beginPath()
+    ctx.arc(0, h * 0.09, w * 0.13, 0.25, Math.PI - 0.25)
+    ctx.strokeStyle = '#3A1E08'
+    ctx.lineWidth = 2.5
+    ctx.stroke()
+    // Small tooth hint
+    ctx.beginPath()
+    ctx.rect(-w * 0.05, h * 0.09, w * 0.1, h * 0.035)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+  }
+
+  // ── Arms (chubby rounded stubs) ────────────────────────────────────────────
+  ;([-1, 1] as const).forEach(side => {
+    const angle    = armsUp ? -1.0 : 0.45
+    const startX   = side * w * 0.39
+    const startY   = -h * 0.02
+    const endX     = startX + side * Math.cos(armsUp ? angle : -angle * side) * 16
+    const endY     = startY - Math.sin(angle) * 16
+
+    ctx.strokeStyle = '#7A4E22'
+    ctx.lineWidth   = 6.5
+    ctx.lineCap     = 'round'
+    ctx.beginPath()
+    ctx.moveTo(startX, startY)
+    ctx.lineTo(endX, endY)
+    ctx.stroke()
+
+    // Round hand
+    ctx.beginPath()
+    ctx.arc(endX, endY, 5, 0, Math.PI * 2)
+    ctx.fillStyle = '#7A4E22'
+    ctx.fill()
+    // Knuckle highlight
+    ctx.beginPath()
+    ctx.arc(endX, endY - 2, 2, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    ctx.fill()
+  })
+
+  // ── Legs and feet ──────────────────────────────────────────────────────────
+  ;([-1, 1] as const).forEach(side => {
+    ctx.strokeStyle = '#7A4E22'
+    ctx.lineWidth   = 5.5
+    ctx.lineCap     = 'round'
+    ctx.beginPath()
+    ctx.moveTo(side * w * 0.2, h * 0.37)
+    ctx.lineTo(side * w * 0.24, h * 0.52)
+    ctx.stroke()
+
+    // Rounded foot
+    ctx.beginPath()
+    ctx.ellipse(side * w * 0.28, h * 0.545, 7, 4.5, side * 0.25, 0, Math.PI * 2)
+    ctx.fillStyle = '#4E2A0C'
+    ctx.fill()
   })
 
   ctx.restore()
@@ -133,13 +242,13 @@ function drawPlatform(ctx: CanvasRenderingContext2D, pl: Platform) {
   ctx.save()
 
   if (type === 'normal') {
+    // 3-D shadow
+    ctx.beginPath(); rr(ctx, x + 2, y + 5, w, PLH, PLH / 2)
+    ctx.fillStyle = '#1A1A1A'; ctx.fill()
     // Outlined pill — white fill, dark border
     ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-    ctx.strokeStyle = '#1A1A1A'
-    ctx.lineWidth = 2.5
-    ctx.stroke()
+    ctx.fillStyle = '#FFFFFF'; ctx.fill()
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2.5; ctx.stroke()
 
   } else {
     // Crumble platform
@@ -165,23 +274,38 @@ function drawPlatform(ctx: CanvasRenderingContext2D, pl: Platform) {
       const shakeX = jumps >= 1 ? (Math.random() - 0.5) * 3 : 0
       ctx.translate(shakeX, 0)
 
+      // 3-D shadow
+      ctx.beginPath(); rr(ctx, x + 2, y + 5, w, PLH, PLH / 2)
+      ctx.fillStyle = '#1A1A1A'; ctx.fill()
       // Outlined pill — orange fill, dark border
       ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
       ctx.fillStyle = '#F4A261'; ctx.fill()
       ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2.5; ctx.stroke()
-
-      // Cracks after first jump
-      if (jumps >= 1) {
-        ctx.strokeStyle = 'rgba(100,40,10,0.7)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'
-        ctx.beginPath(); ctx.moveTo(x + w * 0.32, y + 3); ctx.lineTo(x + w * 0.29, y + PLH - 3); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(x + w * 0.62, y + 3); ctx.lineTo(x + w * 0.66, y + PLH - 3); ctx.stroke()
-        ctx.lineWidth = 1; ctx.globalAlpha = 0.4
-        ctx.beginPath(); ctx.moveTo(x + w * 0.29, y + PLH * 0.5); ctx.lineTo(x + w * 0.62, y + PLH * 0.55); ctx.stroke()
-        ctx.globalAlpha = 1
-      }
     }
   }
 
+  ctx.restore()
+}
+
+function drawSugarCube(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  const s = SC_SIZE
+  ctx.save()
+  // 3-D shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'
+  ctx.beginPath(); rr(ctx, x + 3, y + 4, s, s, 4); ctx.fill()
+  // Face
+  ctx.beginPath(); rr(ctx, x, y, s, s, 4)
+  ctx.fillStyle = '#FFFFFF'; ctx.fill()
+  ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2; ctx.stroke()
+  // Grid lines (sugar texture)
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(x + s / 2, y + 2); ctx.lineTo(x + s / 2, y + s - 2)
+  ctx.moveTo(x + 2, y + s / 2); ctx.lineTo(x + s - 2, y + s / 2)
+  ctx.stroke()
+  // Sparkle dot
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  ctx.beginPath(); ctx.arc(x + 5, y + 5, 2, 0, Math.PI * 2); ctx.fill()
   ctx.restore()
 }
 
@@ -253,6 +377,66 @@ function drawShop(
 
 // ─── Platform factory ─────────────────────────────────────────────────────────
 
+// ─── Background pattern ───────────────────────────────────────────────────────
+
+function createBgPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  const tile = document.createElement('canvas')
+  tile.width  = 110
+  tile.height = 110
+  const t = tile.getContext('2d')
+  if (!t) return null
+
+  const ink = 'rgba(0,0,0,0.07)'  // very faint — blends into white
+
+  // ── Coffee bean A (top-left, angled) ──
+  t.save()
+  t.translate(28, 32); t.rotate(-0.4)
+  t.beginPath(); t.ellipse(0, 0, 13, 8.5, 0, 0, Math.PI * 2)
+  t.strokeStyle = ink; t.lineWidth = 1.5; t.stroke()
+  t.beginPath(); t.moveTo(0, -8.5)
+  t.bezierCurveTo(5, -3, 5, 3, 0, 8.5)
+  t.strokeStyle = ink; t.lineWidth = 1; t.stroke()
+  t.restore()
+
+  // ── Coffee bean B (bottom-right, different angle) ──
+  t.save()
+  t.translate(82, 80); t.rotate(0.9)
+  t.beginPath(); t.ellipse(0, 0, 10, 6.5, 0, 0, Math.PI * 2)
+  t.strokeStyle = ink; t.lineWidth = 1.5; t.stroke()
+  t.beginPath(); t.moveTo(0, -6.5)
+  t.bezierCurveTo(4, -2, 4, 2, 0, 6.5)
+  t.strokeStyle = ink; t.lineWidth = 1; t.stroke()
+  t.restore()
+
+  // ── Steam wisp (centre-right) ──
+  t.save()
+  t.translate(75, 28)
+  t.strokeStyle = ink; t.lineWidth = 1.5; t.lineCap = 'round'
+  t.beginPath()
+  t.moveTo(0, 14)
+  t.bezierCurveTo(-7, 7, 7, 2, 0, -6)
+  t.stroke()
+  t.restore()
+
+  // ── Tiny steam wisp (bottom-left) ──
+  t.save()
+  t.translate(18, 82)
+  t.strokeStyle = ink; t.lineWidth = 1.2; t.lineCap = 'round'
+  t.beginPath()
+  t.moveTo(0, 10)
+  t.bezierCurveTo(-4, 5, 4, 1, 0, -5)
+  t.stroke()
+  t.restore()
+
+  // ── Scattered dots (coffee bubbles) ──
+  ;[[55, 18], [90, 50], [40, 90], [10, 55]].forEach(([dx, dy]) => {
+    t.beginPath(); t.arc(dx, dy, 2.2, 0, Math.PI * 2)
+    t.fillStyle = ink; t.fill()
+  })
+
+  return ctx.createPattern(tile, 'repeat')
+}
+
 function makePlat(id: number, x: number, y: number, width: number, type: Platform['type']): Platform {
   return { id, x, y, width, type, jumps: 0, crumbling: false, crumbleTimer: 0 }
 }
@@ -286,15 +470,31 @@ export default function Game() {
   const cameraRef    = useRef(0)
   const rafRef       = useRef(0)
   const tiltRef      = useRef(0)
-  const keysRef      = useRef({ left: false, right: false })
+  const keysRef      = useRef({ left: false, right: false, touchAx: 0 })
   const squishRef    = useRef(1)
-  const platIdRef    = useRef(0)
-  const shopImgRef   = useRef<HTMLImageElement | null>(null)
+  const platIdRef         = useRef(0)
+  const shopImgRef        = useRef<HTMLImageElement | null>(null)
+  const bgPatternRef      = useRef<CanvasPattern | null>(null)
+  const sprRightIdleRef   = useRef<HTMLImageElement | null>(null)
+  const sprRightJumpRef   = useRef<HTMLImageElement | null>(null)
+  const sprLeftIdleRef    = useRef<HTMLImageElement | null>(null)
+  const sprLeftJumpRef    = useRef<HTMLImageElement | null>(null)
+  const lastDirRef        = useRef<'left' | 'right'>('right')
+  const sugarCubesRef     = useRef<SugarCube[]>([])
+  const sugarRushRef      = useRef(0)
+  const sugarCubeIdRef    = useRef(0)
+  const lastSugarScoreRef  = useRef(-9999)
+  const previewBgCanvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    const img = new Image()
-    img.src = shopImg
-    img.onload = () => { shopImgRef.current = img }
+    const load = (src: string, ref: React.MutableRefObject<HTMLImageElement | null>) => {
+      const img = new Image(); img.src = src; img.onload = () => { ref.current = img }
+    }
+    load(shopImg,      shopImgRef)
+    load(sprRightIdle, sprRightIdleRef)
+    load(sprRightJump, sprRightJumpRef)
+    load(sprLeftIdle,  sprLeftIdleRef)
+    load(sprLeftJump,  sprLeftJumpRef)
   }, [])
 
   const [phase, setPhase]               = useState<GamePhase>('idle')
@@ -303,6 +503,22 @@ export default function Game() {
   const [personalBest, setPersonalBest] = useState(() =>
     parseInt(localStorage.getItem(PB_KEY) || '0', 10)
   )
+
+  // ── Preview background pattern ─────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'idle') return
+    const canvas = previewBgCanvasRef.current
+    if (!canvas) return
+    canvas.width  = canvas.offsetWidth  || 400
+    canvas.height = canvas.offsetHeight || 600
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const pat = createBgPattern(ctx)
+    if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, canvas.width, canvas.height) }
+  }, [phase])
+
 
   // ── Canvas sizing — uses full viewport (canvas is fixed inset-0) ────────────
 
@@ -352,10 +568,17 @@ export default function Game() {
       e.preventDefault()
       const rect = canvas.getBoundingClientRect()
       const tx   = e.touches[0].clientX - rect.left
-      keysRef.current.left  = tx < canvas.width / 2
-      keysRef.current.right = tx >= canvas.width / 2
+      // Normalised -1..+1 relative to canvas centre; clamp to [-1, 1]
+      const norm = Math.max(-1, Math.min(1, (tx - canvas.width / 2) / (canvas.width / 2)))
+      keysRef.current.touchAx = norm
+      keysRef.current.left    = norm < -0.05
+      keysRef.current.right   = norm >  0.05
     }
-    const onEnd = () => { keysRef.current.left = false; keysRef.current.right = false }
+    const onEnd = () => {
+      keysRef.current.left    = false
+      keysRef.current.right   = false
+      keysRef.current.touchAx = 0
+    }
     canvas.addEventListener('touchstart', onTouch, { passive: false })
     canvas.addEventListener('touchmove',  onTouch, { passive: false })
     canvas.addEventListener('touchend',   onEnd)
@@ -403,17 +626,28 @@ export default function Game() {
     const p     = playerRef.current
     const plats = platformsRef.current
 
-    // Horizontal — tilt has a dead zone, then scales linearly
-    let ax = 0
-    if      (keysRef.current.left)                   ax = -TILT_MULT * 10
-    else if (keysRef.current.right)                  ax =  TILT_MULT * 10
-    else if (Math.abs(tiltRef.current) > TILT_DEAD)  ax =  tiltRef.current * TILT_MULT
+    // Difficulty scales with score: 1× at 0 → 2.5× at score 5000
+    const diff = 1 + Math.min(scoreRef.current / 5000, 1.5)
 
-    p.vx += ax
-    p.vx  = Math.max(-MAX_VX, Math.min(MAX_VX, p.vx))
+    // Horizontal — proportional touch takes priority, then tilt
+    const ta = keysRef.current.touchAx
+    let ax = 0
+    if (Math.abs(ta) > 0.05) {
+      // Proportional: further from centre = more acceleration
+      ax = ta * TILT_MULT * 10
+    } else if (keysRef.current.left) {
+      ax = -TILT_MULT * 10
+    } else if (keysRef.current.right) {
+      ax =  TILT_MULT * 10
+    } else if (Math.abs(tiltRef.current) > TILT_DEAD) {
+      ax =  tiltRef.current * TILT_MULT
+    }
+
+    p.vx += ax * diff
+    p.vx  = Math.max(-MAX_VX * diff, Math.min(MAX_VX * diff, p.vx))
 
     // Friction when no active input
-    if (!keysRef.current.left && !keysRef.current.right && Math.abs(tiltRef.current) < TILT_DEAD + 1) {
+    if (Math.abs(ta) <= 0.05 && !keysRef.current.left && !keysRef.current.right && Math.abs(tiltRef.current) < TILT_DEAD + 1) {
       p.vx *= 0.82
     }
 
@@ -422,12 +656,17 @@ export default function Game() {
     if (p.x + p.w < 0) p.x = W
     if (p.x > W)       p.x = -p.w
 
-    p.vy += GRAVITY
-    p.y  += p.vy
+    // Sugar rush: carry player upward at 4× jump velocity; skip gravity & platforms
+    if (sugarRushRef.current > 0) {
+      p.vy = SUGAR_LIFT_VY
+    } else {
+      p.vy += GRAVITY * diff
+    }
+    p.y += p.vy
 
-    if (p.vy > 0) {
+    if (p.vy > 0 && sugarRushRef.current === 0) {
       for (const pl of plats) {
-        if (pl.crumbling) continue  // can't land on already-crumbling platform
+        if (pl.crumbling) continue
         const pb = p.y + p.h
         if (
           pb >= pl.y &&
@@ -436,18 +675,31 @@ export default function Game() {
           p.x       < pl.x + pl.width - 6
         ) {
           p.y               = pl.y - p.h
-          p.vy              = JUMP_VY
+          p.vy              = JUMP_VY * diff
           squishRef.current = 0.68
           if (pl.type === 'crumble') {
-            pl.jumps++
-            if (pl.jumps >= 2) {
-              pl.crumbling    = true
-              pl.crumbleTimer = 45
-            }
+            pl.crumbling    = true
+            pl.crumbleTimer = 45
           }
           break
         }
       }
+    }
+
+    // Sugar cube collection
+    const cubes = sugarCubesRef.current
+    for (let i = cubes.length - 1; i >= 0; i--) {
+      const sc = cubes[i]
+      if (p.x + p.w > sc.x && p.x < sc.x + SC_SIZE && p.y + p.h > sc.y && p.y < sc.y + SC_SIZE) {
+        cubes.splice(i, 1)
+        sugarRushRef.current = SUGAR_RUSH_FRAMES
+      }
+    }
+
+    // Sugar rush countdown
+    if (sugarRushRef.current > 0) {
+      sugarRushRef.current--
+      if (sugarRushRef.current === 0) { /* rush ended */ }
     }
 
     if (squishRef.current < 1) {
@@ -459,6 +711,7 @@ export default function Game() {
       const delta = threshold - p.y
       p.y = threshold
       plats.forEach(pl => { pl.y += delta })
+      sugarCubesRef.current.forEach(sc => { sc.y += delta })
       cameraRef.current += delta
       scoreRef.current   = Math.floor(cameraRef.current / 7)
       setDisplayScore(scoreRef.current)
@@ -473,23 +726,62 @@ export default function Game() {
       if (pl.y > H + 30) plats.splice(i, 1)
     }
 
+    // Remove off-screen sugar cubes
+    sugarCubesRef.current = sugarCubesRef.current.filter(sc => sc.y < H + 50)
+
     const topY = plats.reduce((m, pl) => Math.min(m, pl.y), H)
     if (topY > 60) {
       const w    = 70 + Math.random() * 45
       const x    = 10 + Math.random() * (W - w - 20)
       const type = Math.random() < 0.3 ? 'crumble' : 'normal'
       plats.push(makePlat(platIdRef.current++, x, topY - (80 + Math.random() * 55), w, type))
+
+      // Spawn a sugar cube occasionally — min 500 score gap, 7% chance, max 1 on screen
+      if (
+        sugarCubesRef.current.length === 0 &&
+        scoreRef.current - lastSugarScoreRef.current > 500 &&
+        Math.random() < 0.07
+      ) {
+        const scX = 20 + Math.random() * (W - SC_SIZE - 40)
+        const scY = topY - (130 + Math.random() * 60)
+        sugarCubesRef.current.push({ id: sugarCubeIdRef.current++, x: scX, y: scY })
+        lastSugarScoreRef.current = scoreRef.current
+      }
     }
 
     if (p.y > H + 80) { endGame(); return }
 
     // ── Draw ──────────────────────────────────────────────────────────────────
 
-    ctx.fillStyle = 'white'
-    ctx.fillRect(0, 0, W, H)
+    // Background — rainbow during sugar rush, patterned otherwise
+    if (sugarRushRef.current > 0) {
+      const hue  = (Date.now() / 15) % 360
+      const grad = ctx.createLinearGradient(0, 0, W, H)
+      grad.addColorStop(0,    `hsl(${hue},            80%, 88%)`)
+      grad.addColorStop(0.33, `hsl(${(hue + 120) % 360}, 80%, 88%)`)
+      grad.addColorStop(0.66, `hsl(${(hue + 240) % 360}, 80%, 88%)`)
+      grad.addColorStop(1,    `hsl(${hue},            80%, 88%)`)
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, W, H)
+    } else {
+      // White base
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, W, H)
+      // Coffee pattern overlay — create once, reuse every frame
+      if (!bgPatternRef.current) bgPatternRef.current = createBgPattern(ctx)
+      if (bgPatternRef.current) {
+        // Scroll the pattern with the camera so it moves with the world
+        ctx.save()
+        ctx.translate(0, cameraRef.current % 110)
+        ctx.fillStyle = bgPatternRef.current
+        ctx.fillRect(0, -110, W, H + 220)
+        ctx.restore()
+      }
+    }
 
     // Platforms drawn first so the shop image paints over any that overlap it
     plats.forEach(pl => drawPlatform(ctx, pl))
+    sugarCubesRef.current.forEach(sc => drawSugarCube(ctx, sc.x, sc.y))
 
     // Shop image — anchored to ground, scrolls with camera, no distortion
     const shopH      = H * SHOP_H_RATIO
@@ -510,7 +802,43 @@ export default function Game() {
       }
     }
 
-    drawBean(ctx, p.x, p.y, p.w, p.h, squishRef.current, p.vy)
+    // Direction — latch last non-zero direction
+    if (p.vx > 0.5)       lastDirRef.current = 'right'
+    else if (p.vx < -0.5) lastDirRef.current = 'left'
+
+    const isJumping = p.vy < -2
+    const sprite = lastDirRef.current === 'right'
+      ? (isJumping ? sprRightJumpRef.current : sprRightIdleRef.current)
+      : (isJumping ? sprLeftJumpRef.current  : sprLeftIdleRef.current)
+
+    if (sprite) {
+      const sq = squishRef.current
+      const sw = p.w * (1 + (1 - sq) * 0.3)
+      const sh = p.h * sq
+      ctx.drawImage(sprite, p.x + (p.w - sw) / 2, p.y + (p.h - sh), sw, sh)
+    } else {
+      drawBean(ctx, p.x, p.y, p.w, p.h, squishRef.current, p.vy)
+    }
+
+    // SUGAR RUSH overlay text
+    if (sugarRushRef.current > 0) {
+      const flash = Math.floor(Date.now() / 180) % 2 === 0
+      if (flash) {
+        const hue = (Date.now() / 10) % 360
+        ctx.save()
+        ctx.font        = `bold ${Math.round(W * 0.1)}px Geist Variable, sans-serif`
+        ctx.textAlign   = 'center'
+        ctx.textBaseline = 'middle'
+        // Outline
+        ctx.strokeStyle = '#1A1A1A'
+        ctx.lineWidth   = 6
+        ctx.strokeText('SUGAR RUSH', W / 2, H * 0.18)
+        // Fill with cycling colour
+        ctx.fillStyle = `hsl(${hue}, 90%, 55%)`
+        ctx.fillText('SUGAR RUSH', W / 2, H * 0.18)
+        ctx.restore()
+      }
+    }
 
     rafRef.current = requestAnimationFrame(tick)
   }, [endGame])
@@ -531,12 +859,16 @@ export default function Game() {
     if (!canvas) return
     const W = canvas.width, H = canvas.height
 
-    cameraRef.current  = 0
-    scoreRef.current   = 0
-    squishRef.current  = 1
-    tiltRef.current    = 0
-    keysRef.current    = { left: false, right: false }
-    platIdRef.current  = 0
+    cameraRef.current       = 0
+    scoreRef.current        = 0
+    squishRef.current       = 1
+    tiltRef.current         = 0
+    keysRef.current         = { left: false, right: false }
+    platIdRef.current       = 0
+    sugarCubesRef.current   = []
+    sugarRushRef.current    = 0
+    sugarCubeIdRef.current  = 0
+    lastSugarScoreRef.current = -9999
     setDisplayScore(0)
 
     const plats = makePlatforms(W, H, platIdRef)
@@ -616,16 +948,21 @@ export default function Game() {
           </div>
 
           {/* Preview card */}
-          <div className="mx-5 flex-1 min-h-0 bg-white rounded-3xl overflow-hidden relative shadow-sm">
+          <div className="mx-5 flex-1 min-h-0 rounded-3xl overflow-hidden relative shadow-sm">
 
-            {/* Static platform decorations — outlined pill style matching gameplay */}
-            <div className="absolute top-[10%] left-[12%] w-[36%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[24%] right-[9%]  w-[40%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[40%] left-[16%] w-[32%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" />
-            <div className="absolute top-[54%] right-[12%] w-[38%] h-[13px] bg-[#F4A261] border-2 border-[#1A1A1A] rounded-full" />
+            {/* Background pattern canvas — fills the card */}
+            <canvas
+              ref={previewBgCanvasRef}
+              className="absolute inset-0 w-full h-full"
+            />
+
+            {/* Static platform decorations — pill + 3D shadow matching gameplay */}
+            <div className="absolute top-[10%] left-[12%] w-[36%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" style={{ boxShadow: '2px 5px 0 #1A1A1A' }} />
+            <div className="absolute top-[24%] right-[9%]  w-[40%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" style={{ boxShadow: '2px 5px 0 #1A1A1A' }} />
+            <div className="absolute top-[40%] left-[16%] w-[32%] h-[13px] bg-white border-2 border-[#1A1A1A] rounded-full" style={{ boxShadow: '2px 5px 0 #1A1A1A' }} />
+            <div className="absolute top-[54%] right-[12%] w-[38%] h-[13px] bg-[#F4A261] border-2 border-[#1A1A1A] rounded-full" style={{ boxShadow: '2px 5px 0 #1A1A1A' }} />
 
             {/* Coffee shop image — bottom 40% of card */}
-            {/* Swap shop.svg for your own image at src/assets/images/shop.svg */}
             <div className="absolute bottom-0 left-0 right-0 h-[40%]">
               <img
                 src={shopImg}
