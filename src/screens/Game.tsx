@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { saveUserWeeklyBest, getUserWeeklyBest, getWeeklyTopScore } from '@/lib/leaderboard'
 // Replace shop.svg with your own image (photo or illustration) at any time
 import shopImg       from '@/assets/images/GRNDshop.png'
 import sprRightIdle  from '@/assets/images/bean-right-idle.png'
@@ -22,22 +24,23 @@ interface SugarCube { id: number; x: number; y: number }
 
 interface Platform {
   id: number; x: number; y: number; width: number
-  type: 'normal' | 'crumble'
+  type: 'normal' | 'crumble' | 'moving'
   jumps: number
   crumbling: boolean
   crumbleTimer: number  // counts down from 45 when crumbling
+  vx: number            // horizontal velocity for moving platforms
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GRAVITY     = 0.38
-const JUMP_VY     = -13.5
+const GRAVITY     = 0.1143 // scaled with JUMP_VY to preserve 1.25s air time
+const JUMP_VY     = -8.55  // 10% lower than original, air time unchanged
 const PW          = 86
 const PH          = 101
 const PLH         = 13
-const MAX_VX      = 7
-const TILT_MULT   = 0.09    // halved tilt sensitivity
-const TILT_DEAD   = 4       // degrees dead zone before tilt kicks in, was 1.5
+const MAX_VX      = 5
+const TILT_MULT   = 0.055   // gentle tilt — Doodle Jump style
+const TILT_DEAD   = 5       // wider dead zone before tilt kicks in
 const PB_KEY             = 'grnd_jump_pb'
 const WEEKLY_HIGH        = 3_280
 const SHOP_H_RATIO       = 0.30   // shop occupies bottom 30% of screen height
@@ -241,7 +244,22 @@ function drawPlatform(ctx: CanvasRenderingContext2D, pl: Platform) {
 
   ctx.save()
 
-  if (type === 'normal') {
+  if (type === 'moving') {
+    // 3-D shadow
+    ctx.beginPath(); rr(ctx, x + 2, y + 5, w, PLH, PLH / 2)
+    ctx.fillStyle = '#1A4A3A'; ctx.fill()
+    // Teal/green pill — distinct from normal
+    ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
+    ctx.fillStyle = '#2ECC71'; ctx.fill()
+    ctx.strokeStyle = '#1A4A3A'; ctx.lineWidth = 2.5; ctx.stroke()
+    // Small arrows indicating movement
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'
+    ctx.font = `bold ${PLH - 2}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(pl.vx > 0 ? '▶' : '◀', x + w / 2, y + PLH / 2)
+
+  } else if (type === 'normal') {
     // 3-D shadow
     ctx.beginPath(); rr(ctx, x + 2, y + 5, w, PLH, PLH / 2)
     ctx.fillStyle = '#1A1A1A'; ctx.fill()
@@ -437,8 +455,8 @@ function createBgPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   return ctx.createPattern(tile, 'repeat')
 }
 
-function makePlat(id: number, x: number, y: number, width: number, type: Platform['type']): Platform {
-  return { id, x, y, width, type, jumps: 0, crumbling: false, crumbleTimer: 0 }
+function makePlat(id: number, x: number, y: number, width: number, type: Platform['type'], vx = 0): Platform {
+  return { id, x, y, width, type, jumps: 0, crumbling: false, crumbleTimer: 0, vx }
 }
 
 function makePlatforms(W: number, H: number, idRef: { current: number }): Platform[] {
@@ -461,6 +479,7 @@ function makePlatforms(W: number, H: number, idRef: { current: number }): Platfo
 
 export default function Game() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const phaseRef     = useRef<GamePhase>('idle')
@@ -485,6 +504,8 @@ export default function Game() {
   const sugarCubeIdRef    = useRef(0)
   const lastSugarScoreRef  = useRef(-9999)
   const previewBgCanvasRef = useRef<HTMLCanvasElement>(null)
+  const weeklyTopRef       = useRef(getWeeklyTopScore())
+  const pbPassedRef        = useRef(false)   // tracks if we've flashed "NEW PB" this run
 
   useEffect(() => {
     const load = (src: string, ref: React.MutableRefObject<HTMLImageElement | null>) => {
@@ -503,6 +524,8 @@ export default function Game() {
   const [personalBest, setPersonalBest] = useState(() =>
     parseInt(localStorage.getItem(PB_KEY) || '0', 10)
   )
+  const [hudMsg, setHudMsg] = useState<string | null>(null)
+  const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Preview background pattern ─────────────────────────────────────────────
   useEffect(() => {
@@ -599,6 +622,14 @@ export default function Game() {
     return () => window.removeEventListener('deviceorientation', handler)
   }, [])
 
+  // ── HUD message helper ─────────────────────────────────────────────────────
+
+  const showHud = useCallback((msg: string, ms = 2000) => {
+    setHudMsg(msg)
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current)
+    hudTimerRef.current = setTimeout(() => setHudMsg(null), ms)
+  }, [])
+
   // ── End game ───────────────────────────────────────────────────────────────
 
   const endGame = useCallback(() => {
@@ -612,7 +643,14 @@ export default function Game() {
       localStorage.setItem(PB_KEY, String(next))
       return next
     })
-  }, [])
+    // Save to weekly leaderboard
+    if (user) {
+      saveUserWeeklyBest(user.email, s)
+      // refresh weekly top in case user just beat it
+      weeklyTopRef.current = Math.max(weeklyTopRef.current, s)
+    }
+    pbPassedRef.current = false
+  }, [user])
 
   // ── Main game tick ─────────────────────────────────────────────────────────
 
@@ -625,9 +663,6 @@ export default function Game() {
 
     const p     = playerRef.current
     const plats = platformsRef.current
-
-    // Difficulty scales with score: 1× at 0 → 2.5× at score 5000
-    const diff = 1 + Math.min(scoreRef.current / 5000, 1.5)
 
     // Horizontal — proportional touch takes priority, then tilt
     const ta = keysRef.current.touchAx
@@ -643,8 +678,8 @@ export default function Game() {
       ax =  tiltRef.current * TILT_MULT
     }
 
-    p.vx += ax * diff
-    p.vx  = Math.max(-MAX_VX * diff, Math.min(MAX_VX * diff, p.vx))
+    p.vx += ax
+    p.vx  = Math.max(-MAX_VX, Math.min(MAX_VX, p.vx))
 
     // Friction when no active input
     if (Math.abs(ta) <= 0.05 && !keysRef.current.left && !keysRef.current.right && Math.abs(tiltRef.current) < TILT_DEAD + 1) {
@@ -660,7 +695,7 @@ export default function Game() {
     if (sugarRushRef.current > 0) {
       p.vy = SUGAR_LIFT_VY
     } else {
-      p.vy += GRAVITY * diff
+      p.vy += GRAVITY
     }
     p.y += p.vy
 
@@ -675,7 +710,7 @@ export default function Game() {
           p.x       < pl.x + pl.width - 6
         ) {
           p.y               = pl.y - p.h
-          p.vy              = JUMP_VY * diff
+          p.vy              = JUMP_VY
           squishRef.current = 0.68
           if (pl.type === 'crumble') {
             pl.crumbling    = true
@@ -715,6 +750,20 @@ export default function Game() {
       cameraRef.current += delta
       scoreRef.current   = Math.floor(cameraRef.current / 7)
       setDisplayScore(scoreRef.current)
+      // Flash HUD when player passes their PB
+      const pb = parseInt(localStorage.getItem(PB_KEY) || '0', 10)
+      if (!pbPassedRef.current && pb > 0 && scoreRef.current > pb) {
+        pbPassedRef.current = true
+        showHud('🎉 NEW PERSONAL BEST!')
+      }
+      // Proximity to weekly record
+      const top = weeklyTopRef.current
+      if (top > 0 && !pbPassedRef.current) {
+        const gap = top - scoreRef.current
+        if (gap > 0 && gap <= 200 && Math.floor(scoreRef.current) % 50 === 0) {
+          showHud(`${gap} pts from weekly record!`)
+        }
+      }
     }
 
     for (let i = plats.length - 1; i >= 0; i--) {
@@ -722,6 +771,12 @@ export default function Game() {
       if (pl.crumbling) {
         pl.crumbleTimer--
         if (pl.crumbleTimer <= 0) { plats.splice(i, 1); continue }
+      }
+      // Move moving platforms and bounce off walls
+      if (pl.type === 'moving') {
+        pl.x += pl.vx
+        if (pl.x <= 0) { pl.x = 0; pl.vx = Math.abs(pl.vx) }
+        if (pl.x + pl.width >= W) { pl.x = W - pl.width; pl.vx = -Math.abs(pl.vx) }
       }
       if (pl.y > H + 30) plats.splice(i, 1)
     }
@@ -733,8 +788,22 @@ export default function Game() {
     if (topY > 60) {
       const w    = 70 + Math.random() * 45
       const x    = 10 + Math.random() * (W - w - 20)
-      const type = Math.random() < 0.3 ? 'crumble' : 'normal'
-      plats.push(makePlat(platIdRef.current++, x, topY - (80 + Math.random() * 55), w, type))
+      const newY = topY - (80 + Math.random() * 55)
+      // Both crumble & moving scale gradually with score — calm start, busier later
+      const t = Math.min(scoreRef.current / 5000, 1)   // 0→1 over first 5000 pts
+      const movingChance  = 0.03 + t * 0.17            // 3% → 20%
+      const crumbleChance = 0.08 + t * 0.20            // 8% → 28%
+      const roll = Math.random()
+      let type: Platform['type'] = 'normal'
+      let platVx = 0
+      if (roll < movingChance) {
+        type = 'moving'
+        // Slower speed: 0.7–1.4 px/frame
+        platVx = (0.7 + Math.random() * 0.7) * (Math.random() < 0.5 ? 1 : -1)
+      } else if (roll < movingChance + crumbleChance) {
+        type = 'crumble'
+      }
+      plats.push(makePlat(platIdRef.current++, x, newY, w, type, platVx))
 
       // Spawn a sugar cube occasionally — min 500 score gap, 7% chance, max 1 on screen
       if (
@@ -841,7 +910,7 @@ export default function Game() {
     }
 
     rafRef.current = requestAnimationFrame(tick)
-  }, [endGame])
+  }, [endGame, showHud])
 
   // ── Start game ─────────────────────────────────────────────────────────────
 
@@ -869,6 +938,9 @@ export default function Game() {
     sugarRushRef.current    = 0
     sugarCubeIdRef.current  = 0
     lastSugarScoreRef.current = -9999
+    pbPassedRef.current  = false
+    weeklyTopRef.current = getWeeklyTopScore()
+    if (user) weeklyTopRef.current = Math.max(weeklyTopRef.current, getUserWeeklyBest(user.email))
     setDisplayScore(0)
 
     const plats = makePlatforms(W, H, platIdRef)
@@ -887,7 +959,7 @@ export default function Game() {
 
     cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(tick)
-  }, [tick, sizeCanvas])
+  }, [tick, sizeCanvas, user])
 
   // ── Play again ─────────────────────────────────────────────────────────────
 
@@ -916,6 +988,29 @@ export default function Game() {
       {phase === 'playing' && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[15px] font-bold px-5 py-2 rounded-full z-[60] pointer-events-none whitespace-nowrap">
           SCORE: {displayScore.toLocaleString()}
+        </div>
+      )}
+
+      {/* PB / weekly record HUD flash */}
+      {phase === 'playing' && hudMsg && (
+        <div className="fixed top-[calc(3rem+3rem)] left-1/2 -translate-x-1/2 bg-[#1A1A1A]/80 backdrop-blur-sm text-white text-[13px] font-bold px-4 py-2 rounded-full whitespace-nowrap z-[60] pointer-events-none">
+          {hudMsg}
+        </div>
+      )}
+
+      {/* PB and weekly record indicators */}
+      {phase === 'playing' && (
+        <div className="fixed top-10 right-3 flex flex-col items-end gap-0.5 z-[60] pointer-events-none">
+          {personalBest > 0 && (
+            <div className="bg-white/70 backdrop-blur-sm rounded-full px-2 py-0.5">
+              <span className="text-[10px] font-semibold text-[#1A1A1A]">PB {personalBest.toLocaleString()}</span>
+            </div>
+          )}
+          {weeklyTopRef.current > 0 && (
+            <div className="bg-[#F4A261]/80 backdrop-blur-sm rounded-full px-2 py-0.5">
+              <span className="text-[10px] font-semibold text-white">🏆 {weeklyTopRef.current.toLocaleString()}</span>
+            </div>
+          )}
         </div>
       )}
 
