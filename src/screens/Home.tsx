@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Coffee } from 'lucide-react'
 import { NumberTicker } from '@/components/ui/number-ticker'
+import { useAuth } from '@/contexts/AuthContext'
+import ProfileSheet from '@/components/layout/ProfileSheet'
 import introSrc  from '@/assets/videos/mascot-intro.mp4'
 import mascotGif from '@/assets/images/mascot-gif.gif'
 
@@ -24,17 +26,9 @@ function CoffeeBean({ filled }: { filled: boolean }) {
   )
 }
 
-const user = {
-  name: 'Alex',
-  points: 2450,
-  nextReward: 3000,
-  streak: 7,
-  maxStreak: 10,
-}
-
 export default function Home() {
-  const pointsToGo = user.nextReward - user.points
-  const progress   = (user.points / user.nextReward) * 100
+  const { user } = useAuth()
+  const [showProfile, setShowProfile] = useState(false)
 
   const introPlayed = sessionStorage.getItem(INTRO_PLAYED_KEY) === 'true'
   const [showGif, setShowGif] = useState(introPlayed)
@@ -56,6 +50,11 @@ export default function Home() {
     return 'Good evening'
   }
 
+  if (!user) return null
+
+  const pointsToGo = user.nextReward - user.points
+  const progress   = Math.min((user.points / user.nextReward) * 100, 100)
+
   return (
     <div className="min-h-screen bg-[#F5F4EF] pb-24">
       {/* Header */}
@@ -66,9 +65,12 @@ export default function Home() {
             GRND
           </span>
         </div>
-        <div className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center">
+        <button
+          onClick={() => setShowProfile(true)}
+          className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center active:scale-95 transition-transform"
+        >
           <span className="text-white text-[13px] font-semibold">{user.name[0]}</span>
-        </div>
+        </button>
       </div>
 
       <div className="px-6 space-y-6">
@@ -76,7 +78,7 @@ export default function Home() {
         <div>
           <p className="text-[#8A8A8E] text-[14px]">Welcome back</p>
           <h1 className="text-[28px] font-semibold text-[#1A1A1A] leading-tight">
-            {getGreeting()}, {user.name}
+            {getGreeting()}, {user.name.split(' ')[0]}
           </h1>
         </div>
 
@@ -89,7 +91,7 @@ export default function Home() {
             <NumberTicker value={user.points} className="text-[56px] font-bold text-[#1A1A1A]" />
           </p>
           <p className="text-[#8A8A8E] text-[13px] mt-2">
-            {pointsToGo.toLocaleString()} points until your next reward
+            {pointsToGo > 0 ? `${pointsToGo.toLocaleString()} points until your next reward` : 'Reward ready to claim!'}
           </p>
           <div className="mt-4 h-1.5 bg-[#F0EFEA] rounded-full overflow-hidden">
             <div
@@ -117,7 +119,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Mascot — sits below streak card in the page flow */}
+        {/* Mascot — sits below streak card */}
         <div className="flex justify-center pt-1 pb-2">
           <div className="w-[352px] h-[352px] pointer-events-none">
             <video
@@ -139,6 +141,8 @@ export default function Home() {
         </div>
 
       </div>
+
+      {showProfile && <ProfileSheet onClose={() => setShowProfile(false)} />}
     </div>
   )
 }

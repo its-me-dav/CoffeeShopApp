@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Home, CreditCard, Gamepad2 } from 'lucide-react'
 
 const tabs = [
@@ -8,6 +8,9 @@ const tabs = [
 ]
 
 export default function BottomNav() {
+  const location = useLocation()
+  if (location.pathname === '/login') return null
+
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-[#E5E5EA] px-6 py-2 z-50">
       <ul className="flex justify-around items-center">

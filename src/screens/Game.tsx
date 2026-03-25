@@ -32,11 +32,11 @@ interface Platform {
 
 const GRAVITY     = 0.38
 const JUMP_VY     = -13.5
-const PW          = 76
-const PH          = 90
+const PW          = 114
+const PH          = 135
 const PLH         = 13
 const MAX_VX      = 7
-const TILT_MULT   = 0.18    // was 0.45 — much less sensitive
+const TILT_MULT   = 0.09    // halved tilt sensitivity
 const TILT_DEAD   = 4       // degrees dead zone before tilt kicks in, was 1.5
 const PB_KEY             = 'grnd_jump_pb'
 const WEEKLY_HIGH        = 3_280

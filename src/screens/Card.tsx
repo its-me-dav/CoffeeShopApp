@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { Wifi, Coffee } from 'lucide-react'
+import { Wifi, Coffee, X, Wallet } from 'lucide-react'
 import { NumberTicker } from '@/components/ui/number-ticker'
 import { Ripple } from '@/components/ui/ripple'
 import { ShimmerButton } from '@/components/ui/shimmer-button'
 import { MagicCard } from '@/components/ui/magic-card'
-
-const user = {
-  name: 'Alex Rivera',
-  points: 1240,
-  tier: 'Premium Member',
-}
+import { useAuth } from '@/contexts/AuthContext'
 
 function QRCode() {
   const modules = [
@@ -46,8 +41,46 @@ function QRCode() {
   )
 }
 
+function WalletModal({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto bg-[#F5F4EF] rounded-t-3xl z-50 p-6 pb-10">
+        <div className="w-10 h-1 bg-[#D1D1D6] rounded-full mx-auto mb-6" />
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-[20px] font-bold text-[#1A1A1A]">Add to Wallet</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#E5E5EA] flex items-center justify-center">
+            <X size={16} className="text-[#1A1A1A]" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center text-center py-4 gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-[#1A1A1A] flex items-center justify-center">
+            <Wallet size={28} className="text-white" />
+          </div>
+          <div>
+            <p className="text-[18px] font-bold text-[#1A1A1A] mb-2">Coming Soon</p>
+            <p className="text-[14px] text-[#8A8A8E] leading-relaxed max-w-[280px]">
+              Apple Wallet and Google Wallet support is on its way. Your GRND loyalty card will live right in your wallet — no app needed to scan.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full mt-6 bg-[#1A1A1A] text-white rounded-2xl py-4 text-[15px] font-semibold active:scale-95 transition-transform"
+        >
+          Got it
+        </button>
+      </div>
+    </>
+  )
+}
+
 export default function Card() {
+  const { user } = useAuth()
   const [flipped, setFlipped] = useState(false)
+  const [showWallet, setShowWallet] = useState(false)
+
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-[#F5F4EF] pb-24">
@@ -77,7 +110,7 @@ export default function Card() {
               transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
             }}
           >
-            {/* ── Front — dark card with MagicCard spotlight + BorderBeam ── */}
+            {/* Front */}
             <MagicCard
               className="absolute inset-0 rounded-3xl"
               spotlightColor="rgba(244,162,97,0.10)"
@@ -110,11 +143,10 @@ export default function Card() {
                     {user.name}
                   </p>
                 </div>
-
               </div>
             </MagicCard>
 
-            {/* ── Back — QR code ── */}
+            {/* Back — QR code */}
             <div
               className="absolute inset-0 bg-white rounded-3xl p-6 flex flex-col items-center justify-center gap-4 shadow-xl"
               style={{
@@ -134,7 +166,7 @@ export default function Card() {
           </div>
         </div>
 
-        {/* NFC Scan Area — Ripple behind the icon circle */}
+        {/* NFC Scan Area */}
         <div className="flex flex-col items-center gap-4 py-6">
           <div className="relative flex items-center justify-center w-24 h-24">
             <Ripple color="#1A1A1A" count={3} maxRadius={60} />
@@ -155,11 +187,16 @@ export default function Card() {
           <ShimmerButton onClick={() => setFlipped(f => !f)}>
             {flipped ? 'Show Card' : 'Show QR Code'}
           </ShimmerButton>
-          <button className="w-full bg-white text-[#1A1A1A] rounded-2xl py-4 text-[15px] font-semibold border border-[#E5E5EA]">
+          <button
+            onClick={() => setShowWallet(true)}
+            className="w-full bg-white text-[#1A1A1A] rounded-2xl py-4 text-[15px] font-semibold border border-[#E5E5EA] active:scale-95 transition-transform"
+          >
             Add to Wallet
           </button>
         </div>
       </div>
+
+      {showWallet && <WalletModal onClose={() => setShowWallet(false)} />}
     </div>
   )
 }
