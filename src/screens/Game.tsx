@@ -524,9 +524,6 @@ export default function Game() {
   const [personalBest, setPersonalBest] = useState(() =>
     parseInt(localStorage.getItem(PB_KEY) || '0', 10)
   )
-  const [hudMsg, setHudMsg] = useState<string | null>(null)
-  const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   // ── Preview background pattern ─────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'idle') return
@@ -620,14 +617,6 @@ export default function Game() {
     }
     window.addEventListener('deviceorientation', handler)
     return () => window.removeEventListener('deviceorientation', handler)
-  }, [])
-
-  // ── HUD message helper ─────────────────────────────────────────────────────
-
-  const showHud = useCallback((msg: string, ms = 2000) => {
-    setHudMsg(msg)
-    if (hudTimerRef.current) clearTimeout(hudTimerRef.current)
-    hudTimerRef.current = setTimeout(() => setHudMsg(null), ms)
   }, [])
 
   // ── End game ───────────────────────────────────────────────────────────────
@@ -924,7 +913,7 @@ export default function Game() {
     }
 
     rafRef.current = requestAnimationFrame(tick)
-  }, [endGame, showHud])
+  }, [endGame])
 
   // ── Start game ─────────────────────────────────────────────────────────────
 
