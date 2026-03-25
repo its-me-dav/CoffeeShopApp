@@ -863,7 +863,7 @@ export default function Game() {
     scoreRef.current        = 0
     squishRef.current       = 1
     tiltRef.current         = 0
-    keysRef.current         = { left: false, right: false }
+    keysRef.current         = { left: false, right: false, touchAx: 0 }
     platIdRef.current       = 0
     sugarCubesRef.current   = []
     sugarRushRef.current    = 0
