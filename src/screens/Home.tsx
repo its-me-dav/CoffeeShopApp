@@ -57,7 +57,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F4EF] pb-24">
+    <div className="min-h-screen bg-[#F5F4EF] pb-56">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-14 pb-6">
         <div className="flex items-center gap-2">
@@ -119,8 +119,8 @@ export default function Home() {
 
       </div>
 
-      {/* Mascot — fixed above the nav bar, standing on it */}
-      <div className="fixed bottom-14 left-1/2 -translate-x-1/2 w-64 h-64 pointer-events-none z-40">
+      {/* Mascot — fixed below the streak card, stays in place while scrolling */}
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-40">
         <video
           ref={introRef}
           src={introSrc}
