@@ -92,6 +92,7 @@ export default function Leaderboard() {
               </div>
               <p className="text-[11px] font-bold text-[#1A1A1A] truncate max-w-[60px] text-center">{entries[0].name}</p>
               <p className="text-[10px] text-[#8A8A8E]">{entries[0].score.toLocaleString()}</p>
+              <p className="text-[9px] text-[#F4A261] font-semibold mt-0.5">Defending 🏆</p>
               <div className="w-full bg-[#1A1A1A] rounded-t-lg mt-1 flex items-center justify-center h-16">
                 <span className="text-white font-bold text-[18px]">1</span>
               </div>

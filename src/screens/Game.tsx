@@ -3,8 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { saveUserWeeklyBest, getUserWeeklyBest, getWeeklyTopScore } from '@/lib/leaderboard'
+import { useDailyLives } from '@/hooks/useDailyLives'
+import { ShimmerButton } from '@/components/ui/shimmer-button'
 // Replace shop.svg with your own image (photo or illustration) at any time
 import shopImg       from '@/assets/images/GRNDshop.png'
+import cupFilled     from '@/assets/images/cup-filled.png'
+import cupEmpty      from '@/assets/images/cup-empty.png'
 import sprRightIdle  from '@/assets/images/bean-right-idle.png'
 import sprRightJump  from '@/assets/images/bean-right-jump.png'
 import sprLeftIdle   from '@/assets/images/bean-left-idle.png'
@@ -503,7 +507,8 @@ export default function Game() {
   const sugarRushRef      = useRef(0)
   const sugarCubeIdRef    = useRef(0)
   const lastSugarScoreRef  = useRef(-9999)
-  const previewBgCanvasRef = useRef<HTMLCanvasElement>(null)
+  const previewBgCanvasRef  = useRef<HTMLCanvasElement>(null)
+  const gameoverBgCanvasRef = useRef<HTMLCanvasElement>(null)
   const weeklyTopRef       = useRef(getWeeklyTopScore())
   const pbPassedRef        = useRef(false)   // tracks if we've flashed "NEW PB" this run
 
@@ -518,17 +523,18 @@ export default function Game() {
     load(sprLeftJump,  sprLeftJumpRef)
   }, [])
 
+  const { lives, maxLives, canPlay, useLife, countdown } = useDailyLives()
+
   const [phase, setPhase]               = useState<GamePhase>('idle')
   const [displayScore, setDisplayScore] = useState(0)
   const [finalScore, setFinalScore]     = useState(0)
   const [personalBest, setPersonalBest] = useState(() =>
     parseInt(localStorage.getItem(PB_KEY) || '0', 10)
   )
-  // ── Preview background pattern ─────────────────────────────────────────────
-  useEffect(() => {
-    if (phase !== 'idle') return
-    const canvas = previewBgCanvasRef.current
-    if (!canvas) return
+  const [isNewPB, setIsNewPB]           = useState(false)
+  const [weeklyRank, setWeeklyRank]     = useState(0)
+  // ── Card background pattern (idle + gameover) ──────────────────────────────
+  function paintCardBg(canvas: HTMLCanvasElement) {
     canvas.width  = canvas.offsetWidth  || 400
     canvas.height = canvas.offsetHeight || 600
     const ctx = canvas.getContext('2d')
@@ -537,6 +543,14 @@ export default function Game() {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     const pat = createBgPattern(ctx)
     if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, canvas.width, canvas.height) }
+  }
+
+  useEffect(() => {
+    if (phase === 'idle' && previewBgCanvasRef.current) paintCardBg(previewBgCanvasRef.current)
+  }, [phase])
+
+  useEffect(() => {
+    if (phase === 'gameover' && gameoverBgCanvasRef.current) paintCardBg(gameoverBgCanvasRef.current)
   }, [phase])
 
 
@@ -628,15 +642,19 @@ export default function Game() {
     setPhase('gameover')
     setFinalScore(s)
     setPersonalBest(prev => {
+      const newPB = s > prev
+      setIsNewPB(newPB)
       const next = Math.max(prev, s)
       localStorage.setItem(PB_KEY, String(next))
       return next
     })
-    // Save to weekly leaderboard
+    // Save to weekly leaderboard and compute rank
     if (user) {
       saveUserWeeklyBest(user.email, s)
-      // refresh weekly top in case user just beat it
       weeklyTopRef.current = Math.max(weeklyTopRef.current, s)
+      const board = getWeeklyLeaderboard(user.email, user.name.split(' ')[0])
+      const entry = board.find(e => e.isCurrentUser)
+      setWeeklyRank(entry?.rank ?? 0)
     }
     pbPassedRef.current = false
   }, [user])
@@ -918,6 +936,8 @@ export default function Game() {
   // ── Start game ─────────────────────────────────────────────────────────────
 
   const startGame = useCallback(async () => {
+    useLife()
+
     const DOE = DeviceOrientationEvent as unknown as {
       requestPermission?: () => Promise<string>
     }
@@ -962,7 +982,7 @@ export default function Game() {
 
     cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(tick)
-  }, [tick, sizeCanvas, user])
+  }, [tick, sizeCanvas, user, useLife])
 
   // ── Play again ─────────────────────────────────────────────────────────────
 
@@ -1037,13 +1057,13 @@ export default function Game() {
             <h1 className="text-[42px] font-black uppercase tracking-tight leading-none text-[#1A1A1A]">
               GRND Jump
             </h1>
-            <p className="text-[#8A8A8E] text-[12px] mt-1.5">
-              Tap to jump your way to the top
+            <p className="text-[#1A1A1A] text-[13px] mt-1.5 font-medium">
+              Rank in the Top 3 this week to win a FREE coffee!
             </p>
           </div>
 
           {/* Preview card */}
-          <div className="mx-5 flex-1 min-h-0 rounded-3xl overflow-hidden relative shadow-sm">
+          <div className="mx-5 flex-1 min-h-0 max-h-[46svh] rounded-3xl overflow-hidden relative border-2 border-[#1A1A1A]">
 
             {/* Background pattern canvas — fills the card */}
             <canvas
@@ -1067,73 +1087,127 @@ export default function Game() {
             </div>
 
             {/* Score pill preview */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-[13px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
-              SCORE: 0
-            </div>
+            {personalBest > 0 && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white rounded-full px-5 py-2 whitespace-nowrap">
+                <span className="text-[13px]">Personal Best: <span className="font-bold">{personalBest.toLocaleString()}</span></span>
+              </div>
+            )}
           </div>
 
-          {/* Personal best + Start */}
-          <div className="px-5 pt-3 pb-4 space-y-2.5 shrink-0">
-            <p className="text-center text-[13px] text-[#8A8A8E]">
-              Personal best:{' '}
-              <span className="text-[#1A1A1A] font-bold">
-                {personalBest > 0 ? personalBest.toLocaleString() : '—'}
-              </span>
-            </p>
-            <button
-              onClick={startGame}
-              className="w-full bg-[#1A1A1A] text-white rounded-2xl py-4 text-[16px] font-bold active:scale-95 transition-transform"
-            >
-              Start Game
-            </button>
+          {/* Lives + Start */}
+          <div className="px-5 pt-3 pb-4 space-y-3 shrink-0">
+            {/* Coffee cup lives */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="flex items-center justify-center gap-3">
+                {Array.from({ length: maxLives }).map((_, i) => (
+                  <img
+                    key={i}
+                    src={i < lives ? cupFilled : cupEmpty}
+                    alt={i < lives ? 'Life available' : 'Life used'}
+                    className="w-10 h-auto"
+                  />
+                ))}
+              </div>
+              {countdown && (
+                <p className="text-[13px] text-[#8A8A8E]">
+                  Next life in: <span className="font-bold text-[#1A1A1A]">{countdown}</span>
+                </p>
+              )}
+            </div>
+            <ShimmerButton onClick={startGame} disabled={!canPlay}>
+              {canPlay ? 'Start Game' : 'No lives left'}
+            </ShimmerButton>
           </div>
         </div>
       )}
 
-      {/* ── GAME OVER — fullscreen overlay ─────────────────────────────────── */}
+      {/* ── GAME OVER ───────────────────────────────────────────────────────── */}
       {phase === 'gameover' && (
-        <div className="fixed inset-0 z-50 bg-[#F5F4EF] flex flex-col items-center justify-center px-6 gap-5">
+        <div className="fixed inset-0 z-50 bg-[#F5F4EF] flex flex-col px-5 pt-12 pb-6" style={{ gap: '14px' }}>
 
-          <div className="text-center">
-            <p className="text-[#8A8A8E] text-[11px] uppercase tracking-widest mb-1">
-              Game Over
-            </p>
-            <p className="text-[72px] font-black text-[#1A1A1A] leading-none">
-              {finalScore.toLocaleString()}
-            </p>
-            <p className="text-[#8A8A8E] text-[14px] mt-1">Final Score</p>
+          {/* Title */}
+          <h1 className="text-[48px] font-black uppercase tracking-tight leading-none text-[#1A1A1A] text-center shrink-0">
+            Game Over
+          </h1>
+
+          {/* Card */}
+          <div className="relative flex-1 min-h-0 max-h-[58svh] rounded-3xl border-2 border-[#1A1A1A] overflow-hidden">
+
+            {/* Background pattern */}
+            <canvas ref={gameoverBgCanvasRef} className="absolute inset-0 w-full h-full" />
+
+            {/* NEW PERSONAL BEST ribbon — card's overflow-hidden clips it */}
+            {isNewPB && (
+              <div
+                className="absolute pointer-events-none z-10"
+                style={{
+                  width: '160px',
+                  top: '32px',
+                  right: '-42px',
+                  transform: 'rotate(45deg)',
+                  background: '#E8843A',
+                  padding: '7px 0',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Shine streak */}
+                <div className="absolute inset-0" style={{
+                  background: 'linear-gradient(105deg, transparent 25%, rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.1) 55%, transparent 70%)',
+                }} />
+                <span className="relative text-white text-[8px] font-black uppercase tracking-widest leading-tight">
+                  New Personal Best
+                </span>
+              </div>
+            )}
+
+            {/* Score pill */}
+            <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white rounded-2xl px-8 py-3 whitespace-nowrap z-10">
+              <span className="text-[40px] font-black leading-none">{finalScore.toLocaleString()}</span>
+            </div>
+
+            {/* Rank */}
+            <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center whitespace-nowrap">
+              <p className="text-[18px] font-bold text-[#1A1A1A]">
+                Current Rank: <span>#{weeklyRank}</span>
+              </p>
+            </div>
+
+            {/* Lives */}
+            <div className="absolute top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1.5">
+              <div className="flex items-center gap-3">
+                {Array.from({ length: maxLives }).map((_, i) => (
+                  <img
+                    key={i}
+                    src={i < lives ? cupFilled : cupEmpty}
+                    alt=""
+                    className="w-14 h-auto"
+                  />
+                ))}
+              </div>
+              {countdown && (
+                <p className="text-[13px] text-[#8A8A8E]">
+                  Next life in: <span className="font-bold text-[#1A1A1A]">{countdown}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Coffee shop image — bottom third */}
+            <div className="absolute bottom-0 left-0 right-0 h-[35%]">
+              <img src={shopImg} alt="GRND Coffee Shop" className="w-full h-full object-contain object-bottom" />
+            </div>
           </div>
 
-          <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="flex justify-between items-center px-5 py-3.5 border-b border-[#E5E5EA]">
-              <span className="text-[#8A8A8E] text-[13px]">Personal Best</span>
-              <span className="text-[#1A1A1A] font-bold text-[14px]">
-                {personalBest.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between items-center px-5 py-3.5">
-              <span className="text-[#8A8A8E] text-[13px]">Weekly High Score</span>
-              <span className="text-[#1A1A1A] font-bold text-[14px]">
-                {WEEKLY_HIGH.toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full space-y-2.5">
-            <button className="w-full bg-[#F4A261] text-white rounded-2xl py-4 text-[15px] font-bold active:scale-95 transition-transform">
-              Claim Weekly Prize
-            </button>
+          {/* Buttons */}
+          <div className="space-y-2.5 shrink-0">
+            <ShimmerButton onClick={playAgain} disabled={!canPlay}>
+              {canPlay ? 'Play Again' : 'No lives left'}
+            </ShimmerButton>
             <button
               onClick={() => navigate('/leaderboard')}
-              className="w-full bg-white text-[#1A1A1A] border border-[#E5E5EA] rounded-2xl py-3.5 text-[14px] font-semibold active:scale-95 transition-transform"
+              className="w-full bg-transparent text-[#1A1A1A] border-2 border-[#1A1A1A] rounded-2xl py-4 text-[15px] font-bold active:scale-95 transition-transform"
             >
               View Leaderboard
-            </button>
-            <button
-              onClick={playAgain}
-              className="w-full bg-[#1A1A1A] text-white rounded-2xl py-3.5 text-[14px] font-semibold active:scale-95 transition-transform"
-            >
-              Play Again
             </button>
           </div>
         </div>
