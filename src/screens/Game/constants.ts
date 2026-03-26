@@ -1,0 +1,13 @@
+export const GRAVITY            = 0.143
+export const JUMP_VY            = -8.55
+export const PW                 = 86
+export const PH                 = 101
+export const PLH                = 13
+export const MAX_VX             = 5
+export const TILT_MULT          = 0.055
+export const TILT_DEAD          = 5
+export const PB_KEY             = 'grnd_jump_pb'
+export const SHOP_H_RATIO       = 0.30
+export const SUGAR_RUSH_FRAMES  = 6 * 60
+export const SUGAR_LIFT_VY      = JUMP_VY * 4
+export const SC_SIZE            = 22
