@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   saveUserWeeklyBest, getUserWeeklyBest,
-  getWeeklyTopScore, getWeeklyLeaderboard,
+  getWeeklyTopScore, getWeeklyLeaderboard, getCompetitors,
 } from '@/lib/leaderboard'
 import { useDailyLives } from '@/hooks/useDailyLives'
 import { createBgPattern, drawBean, drawPlatform, drawSugarCube, drawShop } from './renderer'
@@ -335,7 +335,7 @@ export function useGameEngine() {
       ctx.fillStyle = grad
       ctx.fillRect(0, 0, W, H)
     } else {
-      ctx.fillStyle = '#FFFFFF'
+      ctx.fillStyle = '#FAF0E4'
       ctx.fillRect(0, 0, W, H)
       if (!bgPatternRef.current) bgPatternRef.current = createBgPattern(ctx)
       if (bgPatternRef.current) {
@@ -489,6 +489,7 @@ export function useGameEngine() {
     isNewPB,
     weeklyRank,
     weeklyTop: weeklyTopRef.current,
+    competitors: getCompetitors(),
     startGame,
     playAgain,
     lives,

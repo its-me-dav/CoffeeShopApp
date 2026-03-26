@@ -48,6 +48,12 @@ export function getFriendsLeaderboard(userId: string, userName: string) {
     .map((e, i) => ({ ...e, rank: i + 1 }))
 }
 
+export function getCompetitors() {
+  return [...DUMMY_PLAYERS]
+    .sort((a, b) => b.score - a.score)
+    .map((e, i) => ({ name: e.name, score: e.score, rank: i + 1 }))
+}
+
 export function getWeeklyTopScore(): number {
   // Returns the highest score among all players (dummy + any saved user scores)
   return Math.max(...DUMMY_PLAYERS.map(p => p.score))

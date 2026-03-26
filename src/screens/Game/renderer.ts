@@ -181,11 +181,6 @@ export function drawPlatform(ctx: CanvasRenderingContext2D, pl: Platform) {
     ctx.beginPath(); rr(ctx, x, y, w, PLH, PLH / 2)
     ctx.fillStyle = '#2ECC71'; ctx.fill()
     ctx.strokeStyle = '#1A4A3A'; ctx.lineWidth = 2.5; ctx.stroke()
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'
-    ctx.font = `bold ${PLH - 2}px sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(pl.vx > 0 ? '▶' : '◀', x + w / 2, y + PLH / 2)
 
   } else if (type === 'normal') {
     ctx.beginPath(); rr(ctx, x + 2, y + 5, w, PLH, PLH / 2)

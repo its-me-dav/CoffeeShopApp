@@ -14,7 +14,7 @@ export default function Game() {
     personalBest,
     isNewPB,
     weeklyRank,
-    weeklyTop,
+    competitors,
     startGame,
     playAgain,
     lives,
@@ -37,7 +37,7 @@ export default function Game() {
       />
 
       {phase === 'playing' && (
-        <ScoreHUD displayScore={displayScore} weeklyTop={weeklyTop} />
+        <ScoreHUD displayScore={displayScore} competitors={competitors} />
       )}
 
       {phase === 'idle' && (
@@ -55,6 +55,7 @@ export default function Game() {
       {phase === 'gameover' && (
         <GameOverScreen
           finalScore={finalScore}
+          personalBest={personalBest}
           isNewPB={isNewPB}
           weeklyRank={weeklyRank}
           lives={lives}

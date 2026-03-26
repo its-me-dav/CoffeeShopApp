@@ -6,6 +6,7 @@ import cupEmpty  from '@/assets/images/cup-empty.png'
 
 interface GameOverScreenProps {
   finalScore: number
+  personalBest: number
   isNewPB: boolean
   weeklyRank: number
   lives: number
@@ -17,7 +18,7 @@ interface GameOverScreenProps {
 }
 
 export default function GameOverScreen({
-  finalScore, isNewPB, weeklyRank, lives, maxLives,
+  finalScore, personalBest, isNewPB, weeklyRank, lives, maxLives,
   canPlay, countdown, onPlayAgain, gameoverBgCanvasRef,
 }: GameOverScreenProps) {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export default function GameOverScreen({
         Game Over
       </h1>
 
-      <div className="relative flex-1 min-h-0 max-h-[58svh] rounded-3xl border-2 border-[#1A1A1A] overflow-hidden">
+      <div className="relative flex-1 min-h-0 max-h-[49svh] rounded-3xl border-2 border-[#1A1A1A] overflow-hidden">
         <canvas ref={gameoverBgCanvasRef} className="absolute inset-0 w-full h-full" />
 
         {isNewPB && (
@@ -50,12 +51,17 @@ export default function GameOverScreen({
           </div>
         )}
 
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white rounded-2xl px-8 py-3 whitespace-nowrap z-10">
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white rounded-2xl px-8 py-3 whitespace-nowrap z-10 flex flex-col items-center">
           <span className="text-[40px] font-black leading-none">{finalScore.toLocaleString()}</span>
+          {personalBest > finalScore && (
+            <span className="text-[11px] text-[#8A8A8E] leading-tight mt-0.5">
+              Best <span className="font-bold text-white">{personalBest.toLocaleString()}</span>
+            </span>
+          )}
         </div>
 
-        <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center whitespace-nowrap">
-          <p className="text-[18px] font-bold text-[#1A1A1A]">
+        <div className="absolute top-[33%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center whitespace-nowrap">
+          <p className="text-[22px] font-bold text-[#1A1A1A]">
             Current Rank: <span>#{weeklyRank}</span>
           </p>
         </div>
