@@ -1,5 +1,3 @@
-import sprRightIdle from '@/assets/images/bean-right-idle.png'
-
 interface Competitor {
   name: string
   score: number
@@ -12,7 +10,8 @@ interface ScoreHUDProps {
 }
 
 export default function ScoreHUD({ displayScore, competitors }: ScoreHUDProps) {
-  const next = competitors.find(c => c.score > displayScore)
+  // competitors is sorted descending — reverse to find the closest person just above current score
+  const next = [...competitors].reverse().find(c => c.score > displayScore)
 
   return (
     <div className="fixed top-12 left-0 right-0 z-[60] pointer-events-none" style={{ height: '44px' }}>
@@ -24,17 +23,22 @@ export default function ScoreHUD({ displayScore, competitors }: ScoreHUDProps) {
         </div>
       </div>
 
-      {/* Rank — right side, smaller, never overlaps */}
+      {/* Next competitor — right side */}
       <div className="absolute right-4 top-0 flex items-center h-full">
         {next ? (
           <div className="bg-[#F4A261] rounded-xl px-2.5 py-1.5 flex items-center gap-1.5">
-            <div className="w-6 h-6 rounded-full bg-black/15 flex items-center justify-center overflow-hidden flex-shrink-0">
-              <img src={sprRightIdle} alt="" className="w-5 h-5 object-contain" />
+            {/* Avatar — initial letter */}
+            <div className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-[11px] font-black leading-none">
+                {next.name[0]}
+              </span>
             </div>
             <div>
-              <p className="text-white font-black text-[12px] leading-none">#{next.rank}</p>
+              <p className="text-white font-black text-[11px] leading-none">
+                #{next.rank} {next.name}
+              </p>
               <p className="text-white/80 text-[9px] font-semibold leading-tight mt-0.5">
-                {(next.score - displayScore).toLocaleString()}
+                {(next.score - displayScore).toLocaleString()} to go
               </p>
             </div>
           </div>

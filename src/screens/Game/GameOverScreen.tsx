@@ -37,7 +37,7 @@ export default function GameOverScreen({
           <div
             className="absolute pointer-events-none z-10"
             style={{
-              width: '160px', top: '32px', right: '-42px',
+              width: '200px', top: '26px', right: '-58px',
               transform: 'rotate(45deg)', background: '#E8843A',
               padding: '7px 0', textAlign: 'center', overflow: 'hidden',
             }}

@@ -16,6 +16,7 @@ export default function Home() {
 
   const introPlayed = sessionStorage.getItem(INTRO_PLAYED_KEY) === 'true'
   const [showGif, setShowGif] = useState(introPlayed)
+  const [videoReady, setVideoReady] = useState(false)
   const introRef = useRef<HTMLVideoElement>(null)
 
   const handleIntroEnded = () => {
@@ -111,9 +112,13 @@ export default function Home() {
               src={introSrc}
               playsInline
               muted
+              onLoadedData={() => setVideoReady(true)}
               onEnded={handleIntroEnded}
               className="w-full h-full object-contain"
-              style={{ display: showGif ? 'none' : 'block' }}
+              style={{
+                display: showGif ? 'none' : 'block',
+                visibility: videoReady ? 'visible' : 'hidden',
+              }}
             />
             <img
               src={mascotGif}
