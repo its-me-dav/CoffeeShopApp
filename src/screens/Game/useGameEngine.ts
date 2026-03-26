@@ -49,6 +49,12 @@ export function useGameEngine() {
   const lastSugarScoreRef = useRef(-9999)
   const weeklyTopRef      = useRef(getWeeklyTopScore())
   const pbPassedRef       = useRef(false)
+  const startDelayRef     = useRef(0)
+  const introJumpVYRef    = useRef(JUMP_VY)
+  const dyingRef          = useRef(false)
+  const deathBeanYRef     = useRef(0)
+  const deathBeanVYRef    = useRef(0)
+  const deathPauseRef     = useRef(0)
 
   useEffect(() => {
     const load = (src: string, ref: React.MutableRefObject<HTMLImageElement | null>) => {
@@ -194,6 +200,94 @@ export function useGameEngine() {
     const p     = playerRef.current
     const plats = platformsRef.current
 
+    // ── Death animation: bean falls back down to the shop ─────────────────────
+    if (dyingRef.current) {
+      const beanRestY = H - PH
+
+      ctx.fillStyle = '#FAF0E4'
+      ctx.fillRect(0, 0, W, H)
+      const dImg = shopImgRef.current
+      if (dImg && dImg.naturalWidth > 0) {
+        const dAspect = dImg.naturalWidth / dImg.naturalHeight
+        const dFinalH = Math.min(W / dAspect, H)
+        const dFinalW = dFinalH * dAspect
+        ctx.drawImage(dImg, (W - dFinalW) / 2, H - dFinalH, dFinalW, dFinalH)
+      } else {
+        drawShop(ctx, (W - W * 0.72) / 2, H - H * SHOP_H_RATIO, W * 0.72, H * SHOP_H_RATIO)
+      }
+
+      const beanX = W / 2 - PW / 2
+
+      if (deathPauseRef.current === 0) {
+        deathBeanVYRef.current += GRAVITY
+        deathBeanYRef.current  += deathBeanVYRef.current
+
+        if (deathBeanYRef.current >= beanRestY) {
+          deathBeanYRef.current  = beanRestY
+          deathBeanVYRef.current = 0
+          squishRef.current      = 0.6
+          deathPauseRef.current  = 1
+        }
+
+        const dSprite = sprRightIdleRef.current
+        if (dSprite) ctx.drawImage(dSprite, beanX, deathBeanYRef.current, PW, PH)
+        else drawBean(ctx, beanX, deathBeanYRef.current, PW, PH, 1, deathBeanVYRef.current)
+      } else {
+        if (squishRef.current < 1) squishRef.current = Math.min(1, squishRef.current + 0.04)
+        const sq  = squishRef.current
+        const sw  = PW * (1 + (1 - sq) * 0.3)
+        const sh  = PH * sq
+        const dSprite = sprRightIdleRef.current
+        if (dSprite) {
+          ctx.drawImage(dSprite, beanX + (PW - sw) / 2, beanRestY + (PH - sh), sw, sh)
+        } else {
+          drawBean(ctx, beanX, beanRestY, PW, PH, sq, 0)
+        }
+        deathPauseRef.current++
+        if (deathPauseRef.current > 70) { endGame(); return }
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+      return
+    }
+
+    // 1.5-second intro freeze — render scene but skip all physics
+    if (startDelayRef.current > 0) {
+      startDelayRef.current--
+
+      ctx.fillStyle = '#FAF0E4'
+      ctx.fillRect(0, 0, W, H)
+      if (!bgPatternRef.current) bgPatternRef.current = createBgPattern(ctx)
+      if (bgPatternRef.current) {
+        ctx.save()
+        ctx.translate(0, cameraRef.current % 110)
+        ctx.fillStyle = bgPatternRef.current
+        ctx.fillRect(0, -110, W, H + 220)
+        ctx.restore()
+      }
+      const iImg = shopImgRef.current
+      if (iImg && iImg.naturalWidth > 0) {
+        const iAspect = iImg.naturalWidth / iImg.naturalHeight
+        const iFinalH = Math.min(W / iAspect, H)
+        const iFinalW = iFinalH * iAspect
+        ctx.drawImage(iImg, (W - iFinalW) / 2, H - iFinalH, iFinalW, iFinalH)
+      } else {
+        drawShop(ctx, (W - W * 0.72) / 2, H - H * SHOP_H_RATIO, W * 0.72, H * SHOP_H_RATIO)
+      }
+      const sprite = sprRightIdleRef.current
+      if (sprite) {
+        ctx.drawImage(sprite, p.x, p.y, p.w, p.h)
+      } else {
+        drawBean(ctx, p.x, p.y, p.w, p.h, 1, 0)
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+      return
+    }
+
+    // First frame after delay — launch the bean toward the first platform
+    if (p.vy === 0) p.vy = introJumpVYRef.current
+
     const ta = keysRef.current.touchAx
     let ax = 0
     if (Math.abs(ta) > 0.05) {
@@ -321,7 +415,15 @@ export function useGameEngine() {
       }
     }
 
-    if (p.y > H + 80) { endGame(); return }
+    if (p.y > H + 80) {
+      dyingRef.current       = true
+      deathBeanYRef.current  = -PH - 20
+      deathBeanVYRef.current = 2.5
+      deathPauseRef.current  = 0
+      squishRef.current      = 1
+      rafRef.current = requestAnimationFrame(tick)
+      return
+    }
 
     // ── Draw ──────────────────────────────────────────────────────────────────
 
@@ -451,6 +553,12 @@ export function useGameEngine() {
     sugarCubeIdRef.current    = 0
     lastSugarScoreRef.current = -9999
     pbPassedRef.current       = false
+    startDelayRef.current     = 90
+    dyingRef.current          = false
+    deathPauseRef.current     = 0
+    // Compute jump velocity to clear the first platform from ground level
+    const jumpHeight = H * SHOP_H_RATIO + PH + 60
+    introJumpVYRef.current = -Math.sqrt(2 * GRAVITY * jumpHeight)
     weeklyTopRef.current      = getWeeklyTopScore()
     if (user) weeklyTopRef.current = Math.max(weeklyTopRef.current, getUserWeeklyBest(user.email))
     setDisplayScore(0)
@@ -458,11 +566,10 @@ export function useGameEngine() {
     const plats = makePlatforms(W, H, platIdRef)
     platformsRef.current = plats
 
-    const sp = plats[0]
     playerRef.current = {
-      x: sp.x + sp.width / 2 - PW / 2,
-      y: sp.y - PH,
-      vx: 0, vy: JUMP_VY,
+      x: W / 2 - PW / 2,
+      y: H - PH,
+      vx: 0, vy: 0,
       w: PW, h: PH,
     }
 
